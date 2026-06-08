@@ -161,7 +161,7 @@ func (info *typeInfo) print(data []byte) {
 	}
 	info.parse(root, data)
 	
-	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
+	print.Print(root, (*Node).getChildren, (*Node).getContent)
 }
 
 //print your tssd []byte
@@ -188,6 +188,6 @@ func (factory Factory) Print(version string, data []byte) {
 	root.Children = append(root.Children, headerNode)
 	info.parse(root, remain)
 	
-	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
+	print.Print(root, (*Node).getChildren, (*Node).getContent)
 
 }
