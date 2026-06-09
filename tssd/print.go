@@ -100,7 +100,6 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		node.Content, buf = dprintf[bool](info, "%s(%s): %t", buf)
 	case Tstring:
 		node.Content, buf = dprintf[string](info, "%s(%s): %s", buf)
-		fmt.Println("node Content string:", node.Content)
 	case Ttime:
 		if len(buf) < 3 {
 			fmt.Println("need more data size: ", len(buf))

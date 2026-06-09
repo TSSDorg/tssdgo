@@ -17,7 +17,7 @@ type student = student_V3
 
 ////////////////////////////the student V3////////////////////////////////////
 //after you need add/update the struct 
-//you need implment Upgrade() string to specify which version 
+//you need implment Progeny() string to specify which version 
 //and rename a new class name
 type student_V3 struct {
 	tssd.Flat[student_V3, *student_V3]
@@ -48,7 +48,7 @@ func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
 
 ////////////////////////////the student V2////////////////////////////////////
 //after you need add/update the struct 
-//you need implment Upgrade() string to specify which version 
+//you need implment Progeny() string to specify which version 
 //and rename a new class name
 type student_V2 struct {
 	tssd.Flat[student_V2, *student_V2]
@@ -69,13 +69,13 @@ func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	return this
 }
 
-func (this *student_V2) Upgrade() string {
+func (this *student_V2) Progeny() string {
 	return "student_V3"
 }
 
 ////////////////////////////the student V1////////////////////////////////////
 //after you need add/update the struct 
-//you need implment Upgrade() string to specify which version 
+//you need implment Progeny() string to specify which version 
 //and rename a new class name
 type student_V1 struct {
 	tssd.Flat[student_V1, *student_V1]
@@ -87,7 +87,7 @@ func (this *student_V1) Version() string {
 	return "student_V1"
 }
 
-func (this *student_V1) Upgrade() string {
+func (this *student_V1) Progeny() string {
 	return "student_V2"
 }
 

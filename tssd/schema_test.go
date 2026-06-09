@@ -14,7 +14,7 @@ type worker = worker_V2
 
 ////////////////////////////the worker V2////////////////////////////////////
 //after you need add/update the struct 
-//you need implment Upgrade() string to specify which version 
+//you need implment Progeny() string to specify which version 
 //and rename a new class name
 type worker_V2 struct {
 	tssd.Flat[worker_V2, *worker_V2]
@@ -35,7 +35,7 @@ func (this *worker_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	return this
 }
 
-func (this *worker_V2) Upgrade() string {
+func (this *worker_V2) Progeny() string {
 	return "worker_V3"
 }
 
@@ -53,7 +53,7 @@ func (this *worker_V2) OnSchema(factory tssd.Factory, schema string) (hash strin
 
 ////////////////////////////the worker V1////////////////////////////////////
 //after you need add/update the struct 
-//you need implment Upgrade() string to specify which version 
+//you need implment Progeny() string to specify which version 
 //and rename a new class name
 type worker_V1 struct {
 	tssd.Flat[worker_V1, *worker_V1]
@@ -65,7 +65,7 @@ func (this *worker_V1) Version() string {
 	return "worker_V1"
 }
 
-func (this *worker_V1) Upgrade() string {
+func (this *worker_V1) Progeny() string {
 	return "worker_V2"
 }
 

@@ -11,7 +11,7 @@ type BuildFunc = func() Flatable
 
 type buildInfo struct {
 	version string //current version
-	upgrade string //which version it can upgrade after decoration
+	progeny string //which version it can upgrade after decoration
 	schema  string //current schema
 	hash    string
 	info    *typeInfo
@@ -44,12 +44,13 @@ type Flatable interface {
 	//return none-nil error will block factory to Unmarsh
 	OnSchema(factory Factory, schema string) (hash string, err error)
 
-	//the current version and class name of the object
+	//the current version or class name of the object
 	Version() string
 
+	//Progeny or Successor of current version
 	//which version it can upgrade to after Decorate
 	//default it should return "", which means latest
-	Upgrade() string
+	Progeny() string
 
 	//After Unmarshal, Decorate the object to support convert some info or migration/upgrate the object
 	Decorate(Flatable) Flatable
@@ -70,7 +71,7 @@ func (*Flat[T, PT]) Version() string {
 	return TSSD_FLAT_KIND
 }
 
-func (*Flat[T, PT]) Upgrade() string {
+func (*Flat[T, PT]) Progeny() string {
 	return ""
 }
 
@@ -122,7 +123,7 @@ func (factory Factory) Register(flat Flatable) {
 	info := parse(reflect.New(v).Elem().Interface())
 	bi := &buildInfo{
 		version: flat.Version(),
-		upgrade: flat.Upgrade(),
+		progeny: flat.Progeny(),
 		info:    info,
 		builder: flat.Build(), //we build a new one, rather user's data
 	}
@@ -195,7 +196,7 @@ func (factory Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 
 // chain upgate it to the latest
 func (factory Factory) decorate(flat, to Flatable) (Flatable, error) {
-	for v := flat.Upgrade(); len(v) > 0; {
+	for v := flat.Progeny(); len(v) > 0; {
 		if v == to.Version() {
 			return to.Decorate(flat), nil
 		}
@@ -205,7 +206,7 @@ func (factory Factory) decorate(flat, to Flatable) (Flatable, error) {
 			return nil, ErrorTSSDDataSchemaReject
 		}
 		flat = bi.builder.Build().Decorate(flat)
-		v = flat.Upgrade()
+		v = flat.Progeny()
 	}
 	//your may specify unmarshal to a old one
 	return nil, ErrorTSSDDataSchemaReject
@@ -235,7 +236,7 @@ func (factory Factory) Unmarshal(src []byte) (Flatable, []byte, error) {
 		return nil, src, err
 	}
 
-	v := obj.Upgrade()
+	v := obj.Progeny()
 	if len(v) == 0 || obj.Version() == factory.current {
 		return obj, remain, nil
 	}
