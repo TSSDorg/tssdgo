@@ -236,16 +236,16 @@ func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, dest []byte) ([]
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type)) //TmergeArray
+	dest = append(dest, byte(ti.Type))         //TmergeArray
 	dest = append(dest, byte(ti.info[0].Type)) //Telement
 
-	totalSize := ti.info[0].Size*arrayN
-	dest = appendSize(dest, totalSize)   //total Size 
-	dest = appendSize(dest, arrayN)      //S
+	totalSize := ti.info[0].size * arrayN
+	dest = appendSize(dest, totalSize) //total Size
+	dest = appendSize(dest, arrayN)    //S
 
 	for i := range arrayN {
 		s := simpleSave[ti.info[0].rtype.Kind()](value.Index(i))
-		dest = append(dest, Slice(Ptr(s), Size_t(ti.info[0].Size))...)
+		dest = append(dest, Slice(Ptr(s), Size_t(ti.info[0].size))...)
 	}
 	return dest, nil
 }
@@ -258,13 +258,13 @@ func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain 
 	}
 	var size int
 	switch int8(src[0]) {
-	case ti.Type:       //src[0]:TmergeArray, src[1] Telement
+	case ti.Type: //src[0]:TmergeArray, src[1] Telement
 		if len(src) < 4 {
 			//TODO, add field name info
 			return v, src, ErrorInSufficientData
 		}
 		size = int(dumpSize(src[2:]))
-		if len(src) < 4 + size {
+		if len(src) < 4+size {
 			//TODO, add field name info
 			return v, src, ErrorInSufficientData
 		}
@@ -279,8 +279,8 @@ func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain 
 		r := src[6:]
 		for i := 0; i < arrayN; i++ {
 			obj := simpleDump[ti.info[0].rtype.Kind()]()
-			copy(Slice(Ptr(obj), Size_t(ti.info[0].Size)), r[:ti.info[0].Size])
-			r = r[ti.info[0].Size:]
+			copy(Slice(Ptr(obj), Size_t(ti.info[0].size)), r[:ti.info[0].size])
+			r = r[ti.info[0].size:]
 			d.Index(i).Set(reflect.NewAt(ti.info[0].rtype, obj).Elem())
 		}
 

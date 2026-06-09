@@ -198,9 +198,10 @@ func TestStudent(t *testing.T) {
 	}
 }
 
-/*
+
 func TestPrintMap(t *testing.T) {
 	type student struct {
+		tssd.Flat[student, *student]
 		ID    int64
 		Levels  []int
 		Birth     time.Time
@@ -217,15 +218,15 @@ func TestPrintMap(t *testing.T) {
 			"english": {"englis", now.AddDate(0, -2, 0), 93.8},
 		},
 	}
-	container := parse(s1)
+	container := tssd.New(&s1)
 
-	n, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	n, _ := container.MarshalTo(&s1, make([]byte, 0, 2048))
 
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	container.Print(n)
+	container.Print(s1.Version(), n)
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
 
 	out := []byte{112, 104, 105, 115, 105,}
@@ -234,8 +235,8 @@ func TestPrintMap(t *testing.T) {
 
 	var sout student
 	
-	container.unmarshal(n, &sout)
+	container.UnmarshalTo(n, &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)
 }
-*/
+
