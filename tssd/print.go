@@ -35,7 +35,7 @@ func dprintf[T comparable](info *typeInfo, format string, buf []byte) (string, [
 
 func dprintf2[T comparable](info *typeInfo, format string, buf []byte) string {
 	var d T
-	copy(Slice(Ptr(&d), Size_t(info.Size)), buf)
+	copy(Slice(Ptr(&d), Size_t(info.size)), buf)
 	return fmt.Sprintf(format, d)
 }
 
@@ -173,7 +173,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		remain := buf[6:]
 		for i := 0; i < arrayN; i++ {
 			node.Content += parseMergeArray(&info.info[0], int8(buf[1]), remain)
-			remain = remain[info.info[0].Size:]
+			remain = remain[info.info[0].size:]
 		}
 		node.Content += "]"
 		return remain
