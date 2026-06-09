@@ -17,15 +17,15 @@ type mapSave = func(*typeInfo, reflect.Value, []byte) ([]byte, error) //map save
 type mapDump = func(*typeInfo, []byte) (reflect.Value, []byte, error) //map dump func
 
 type typeInfo struct {
-	rtype  reflect.Type
-	Type   int8   //tssd type
-	info   []typeInfo //nest typeInfo
-	save   saveFunc
-	dump   dumpFunc
-	Size   int
-	Offset Size_t
-	Name   string
-	stype  []byte //all the type stream, includeing fields
+	rtype         reflect.Type
+	Type          int8       //tssd type
+	info          []typeInfo //nest typeInfo
+	save          saveFunc
+	dump          dumpFunc
+	Size          int
+	offset        Size_t
+	name          string
+	stype         []byte //all the type stream, includeing fields
 	isFixedLength bool
 	mapSave
 	mapDump
@@ -57,7 +57,6 @@ func (info *typeInfo) types() []byte {
 	return info.stype
 }
 
-
 func (ti *typeInfo) memAppend(src Ptr, dest []byte) ([]byte, error) {
 	dest = append(dest, byte(ti.Type))
 	//dest = dest[0:len(dest)+ti.Size]
@@ -74,7 +73,7 @@ func (ti *typeInfo) memDump(src []byte, dest Ptr) ([]byte, error) {
 
 	switch int8(src[0]) {
 	case ti.Type:
-		if len(src) < 1 + ti.Size {
+		if len(src) < 1+ti.Size {
 			//TODO, add field name info
 			return src, ErrorInSufficientData
 		}
@@ -169,7 +168,7 @@ func (ti *typeInfo) objSave(src Ptr, dest []byte) ([]byte, error) {
 	dest = appendSize(dest, 0)            //reserved total Size (S)
 	dest = appendSize(dest, len(ti.info)) //S
 	for i := range len(ti.info) {
-		dest, _ = ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].Offset), dest)
+		dest, _ = ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), dest)
 	}
 	appendSize(dest[:sizePos], len(dest)-sizePos-2) //object size exclude size self(2bytes)
 
@@ -200,7 +199,7 @@ func (ti *typeInfo) objDump(src []byte, dest Ptr) (remain []byte, err error) {
 		}
 		r := src[5:]
 		for i := range fields {
-			if r, err = ti.info[i].dump(&ti.info[i], r, Ptr(Size_t(dest)+ti.info[i].Offset)); err != nil {
+			if r, err = ti.info[i].dump(&ti.info[i], r, Ptr(Size_t(dest)+ti.info[i].offset)); err != nil {
 				return src, err
 			}
 		}
@@ -241,7 +240,7 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 		//TODO, add field name info
 		return src, ErrorInSufficientData
 	}
-	
+
 	var size int
 	switch int8(src[0]) {
 	case ti.Type:
@@ -285,7 +284,6 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 	return src[3+size:], nil
 }
 
-
 //[TmergeArray][Ttype][size][arrayN][data]
 func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 	arrayN := ti.Size
@@ -297,12 +295,12 @@ func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 		}
 	}
 
-	dest = append(dest, byte(ti.Type)) //T
+	dest = append(dest, byte(ti.Type))         //T
 	dest = append(dest, byte(ti.info[0].Type)) // we add a element data type after T
 
-	totalSize := ti.info[0].Size*arrayN  
-	dest = appendSize(dest, 2 + totalSize)      //arrayN  + total Size 
-	dest = appendSize(dest, arrayN) //S
+	totalSize := ti.info[0].Size * arrayN
+	dest = appendSize(dest, 2+totalSize) //arrayN  + total Size
+	dest = appendSize(dest, arrayN)      //S
 
 	//TODO, for big-endian, we need copy one by one
 	return append(dest, Slice(Ptr(addr), Size_t(totalSize))...), nil
@@ -315,7 +313,7 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 	}
 	var size int
 	switch int8(src[0]) {
-	case ti.Type:  //[0]: TmergeArray, [1]: elementType
+	case ti.Type: //[0]: TmergeArray, [1]: elementType
 		if len(src) < 4 {
 			//TODO, add field name info
 			return src, ErrorInSufficientData
@@ -343,7 +341,7 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 
 		//TODO, for big-endian, we need copy one by one
 		copy(Slice(addr, Size_t(arrayN*ti.info[0].Size)), src[6:])
-		
+
 	case -ti.Type:
 		//skip this field
 		return src[1:], nil
@@ -352,7 +350,6 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 	}
 	return src[4+size:], nil
 }
-
 
 func (ti *typeInfo) dictSave(src Ptr, dest []byte) ([]byte, error) {
 
@@ -538,8 +535,8 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 				continue
 			}
 
-			ti.info[j].Offset = fields.Field(i).Offset
-			ti.info[j].Name = fields.Field(i).Name
+			ti.info[j].offset = fields.Field(i).Offset
+			ti.info[j].name = fields.Field(i).Name
 			j++
 		}
 		ti.info = ti.info[:j]
@@ -561,12 +558,12 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			ti.info = ti.info[:0]
 			return ti
 		}
-		
+
 		if ti.info[0].isFixedLength {
 			ti.setType(TmergeArray)
 			ti.save = (*typeInfo).mergeSliceSave
 			ti.dump = (*typeInfo).mergeSliceDump
-			ti.mapSave, ti.mapDump = (*typeInfo).mapMergeSliceValueSave, (*typeInfo).mapMergeSliceValueDump			
+			ti.mapSave, ti.mapDump = (*typeInfo).mapMergeSliceValueSave, (*typeInfo).mapMergeSliceValueDump
 		}
 
 	case reflect.Map:
@@ -599,6 +596,6 @@ func parse(intf interface{}) (ti *typeInfo) {
 
 	ti = &typeInfo{stype: make([]byte, 0, 1024)}
 	ti.root = ti
-	
+
 	return ti.doParse(intf)
 }

@@ -1,11 +1,11 @@
 # TSSDGo
-[TSSD](http://https://github.com/TSSDorg/TSSD-Spec "TSSD") is an open binary data for excange or storage.
+[TSSD](http://https://github.com/TSSDorg/TSSD-Spec "TSSD") is an open binary data for exchange or storage.
 tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data with this go package easily.
 ## features
 
 - **API simple** **effective**: parse with reflect once, run without reflect(except map) 
-- **schema validation**: validate schema to prevent crash caused unmashaling unmatched data
-- **struct migration support**: support receive old struct data and migration the latest version
+- **schema validation**: validate schema to prevent crash caused by unmashaling unmatched data
+- **struct migration support**: support receive old struct data and migration to the latest version
 - **less depenency**: depend github.com/eineder/printtree only, which for print TSSD data
 
 ## quick start

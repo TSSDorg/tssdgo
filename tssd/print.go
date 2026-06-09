@@ -22,7 +22,7 @@ func (node *Node) getContent() string {
 
 func (node *Node) print() {
 	fmt.Println("node.content:", node.Content)
-	for i:=0; i<len(node.Children); i++ {
+	for i := 0; i < len(node.Children); i++ {
 		node.Children[i].print()
 	}
 }
@@ -30,7 +30,41 @@ func (node *Node) print() {
 func dprintf[T comparable](info *typeInfo, format string, buf []byte) (string, []byte) {
 	var d T
 	remain, _ := info.dump(info, buf, Ptr(&d))
-	return fmt.Sprintf(format, info.Name, info.rtype.String(), d), remain
+	return fmt.Sprintf(format, info.name, info.rtype.String(), d), remain
+}
+
+func dprintf2[T comparable](info *typeInfo, format string, buf []byte) string {
+	var d T
+	copy(Slice(Ptr(&d), Size_t(info.Size)), buf)
+	return fmt.Sprintf(format, d)
+}
+
+func parseMergeArray(info *typeInfo, ttype int8, buf []byte) string {
+	switch int8(ttype) {
+	case Tint8:
+		return dprintf2[int8](info, "%d,", buf)
+	case Tuint8:
+		return dprintf2[uint8](info, "%d,", buf)
+	case Tint16:
+		return dprintf2[int16](info, "%d,", buf)
+	case Tuint16:
+		return dprintf2[uint16](info, "%d,", buf)
+	case Tint32:
+		return dprintf2[int32](info, "%d,", buf)
+	case Tuint32:
+		return dprintf2[uint32](info, "%d,", buf)
+	case Tint64:
+		return dprintf2[int64](info, "%d,", buf)
+	case Tuint64:
+		return dprintf2[uint64](info, "%d,", buf)
+	case Tfloat32:
+		return dprintf2[float32](info, "%f,", buf)
+	case Tfloat64:
+		return dprintf2[float64](info, "%f,", buf)
+	case Tbool:
+		return dprintf2[bool](info, "%t,", buf)
+	}
+	return ""
 }
 
 func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
@@ -83,7 +117,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 			fmt.Println("parse time err:", err)
 			return buf
 		}
-		node.Content = fmt.Sprintf("%s(%s): %s", info.Name, info.rtype.String(), t.Format(time.RFC3339Nano))
+		node.Content = fmt.Sprintf("%s(%s): %s", info.name, info.rtype.String(), t.Format(time.RFC3339Nano))
 
 		return buf[3+size:]
 
@@ -99,7 +133,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		}
 		fields := int(dumpSize(buf[3:]))
 
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: fields:%d)", info.Name, info.rtype.String(), size, fields)
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: fields:%d)", info.name, info.rtype.String(), size, fields)
 		remain := buf[5:]
 		for i := range fields {
 			remain = info.info[i].parse(node, remain)
@@ -117,11 +151,31 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		}
 		arrayN := int(dumpSize(buf[3:]))
 
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.Name, info.rtype.String(), size, arrayN)
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), size, arrayN)
 		remain := buf[5:]
 		for i := 0; i < arrayN; i++ {
 			remain = info.info[0].parse(node, remain)
 		}
+		return remain
+	case TmergeArray: //[TmergeArray][Ttype][sizet][sizea][data]
+		if len(buf) < 6 {
+			fmt.Println("need more data: ", len(buf))
+			return buf
+		}
+		size := int(dumpSize(buf[2:]))
+		if len(buf) < 4+size {
+			fmt.Println("need more data size: ", len(buf), size)
+			return buf
+		}
+		arrayN := int(dumpSize(buf[4:]))
+
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)%s[", info.name, info.rtype.String(), size, arrayN, info.info[0].rtype.String())
+		remain := buf[6:]
+		for i := 0; i < arrayN; i++ {
+			node.Content += parseMergeArray(&info.info[0], int8(buf[1]), remain)
+			remain = remain[info.info[0].Size:]
+		}
+		node.Content += "]"
 		return remain
 	case Tdict:
 		if len(buf) < 3 {
@@ -135,11 +189,11 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		}
 
 		mapLen := int(dumpSize(buf[3:]))
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.Name, info.rtype.String(), size, mapLen)
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), size, mapLen)
 		remain := buf[5:]
 		fmt.Println("mapLen:", mapLen, node.Content, remain)
 		for k := 0; k < mapLen; k++ {
-			kvNode := &Node {
+			kvNode := &Node{
 				Content: fmt.Sprintf("KVNode[%d]", k),
 			}
 			node.Children = append(node.Children, kvNode)
@@ -155,13 +209,13 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 }
 
 func (info *typeInfo) print(data []byte) {
-	
+
 	root := &Node{
-		Content: fmt.Sprintf("root-%s(%s)", info.Name, info.rtype.String()),
+		Content: fmt.Sprintf("root-%s(%s)", info.name, info.rtype.String()),
 	}
 	info.parse(root, data)
-	
-	print.Print(root, (*Node).getChildren, (*Node).getContent)
+
+	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
 }
 
 //print your tssd []byte
@@ -187,7 +241,6 @@ func (factory Factory) Print(version string, data []byte) {
 
 	root.Children = append(root.Children, headerNode)
 	info.parse(root, remain)
-	
-	print.Print(root, (*Node).getChildren, (*Node).getContent)
 
+	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
 }
