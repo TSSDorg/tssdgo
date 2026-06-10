@@ -156,7 +156,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 			remain = info.info[0].parse(node, remain)
 		}
 		return remain
-	case TmergeArray: //[TmergeArray][Ttype][sizet][sizea][data]
+	case Tarraym: //[Tarraym][Ttype][sizet][sizea][data]
 		if len(buf) < 6 {
 			fmt.Println("need more data: ", len(buf))
 			return buf

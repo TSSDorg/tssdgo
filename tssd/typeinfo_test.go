@@ -161,7 +161,6 @@ func TestSliceUint(t *testing.T) {
 	
 	container := parse(in1)
 	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
-	fmt.Println("Tarray, TmergeArray, Tobject", Tarray, TmergeArray, Tobject, n)
 	fmt.Println(s2)
 
 	container.unmarshal(n, &s2)

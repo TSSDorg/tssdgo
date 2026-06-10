@@ -24,13 +24,13 @@ const (
 	Tfloat32
 	Tfloat64
 	Tstring //dynamic length data
-	Ttime   //RFC3339Nano string	
+	Ttime   //RFC3339Nano string
 	Tschema //schema meta data string
 	Tarray
-	TmergeArray   //merged array, elements including 1 simple fixed length data only
-	Tobject //struct	
-	Tdict    //map, pairs of (key, value)
-	Traw   //raw binary data
+	Tarraym //merged array, elements including 1 simple fixed length data only
+	Tobject //struct
+	Tdict   //map, pairs of (key, value)
+	Traw    //raw binary data
 
 	Tuser = 0xEF //user define data
 )
@@ -40,9 +40,9 @@ var ErrorInSufficientData = errors.New("Need more data to process")
 var ErrorTSSDDataSchemaReject = errors.New("TSSD data schema not match")
 
 type Header struct {
-	Magic       [4]byte
-	Version     int16
-	Schema      string // string content
+	Magic   [4]byte
+	Version int16
+	Schema  string // string content
 }
 
 func appendHeader(buf []byte, schema string) []byte {
@@ -80,14 +80,6 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 	if len(buf[9:]) < int(dsize) {
 		return nil, buf, fmt.Errorf("%w [data version]", ErrorInSufficientData)
 	}
-	header.Schema = string(buf[9: 9+dsize])
+	header.Schema = string(buf[9 : 9+dsize])
 	return header, buf[9+dsize:], nil
 }
-
-
-
-
-
-
-
-
