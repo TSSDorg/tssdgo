@@ -7,7 +7,7 @@ import (
 
 // data type define
 const (
-	MAGIC               = "TSSD"
+	MAGIC               = "SSD"
 	TSSD_VERSION        = 1
 	TSSD_FLAT_KIND      = "tssd.Flat"
 	TSSD_TIME_KIND      = "time.Time"
@@ -25,13 +25,14 @@ const (
 	Tfloat64
 	Tstring //dynamic length data
 	Ttime   //RFC3339Nano string
-	Tschema //schema meta data string
 	Tarray
 	Tarraym //merged array, elements including 1 simple fixed length data only
 	Tobject //struct
 	Tdict   //map, pairs of (key, value)
 	Traw    //raw binary data
-
+	Tschema = 83 //'S' schema meta data string
+	Theader   = 84 //'T' tssd header
+	Tversion= 86 //'V' tssd format version
 	Tuser = 0xEF //user define data
 )
 
@@ -47,7 +48,9 @@ type Header struct {
 
 func appendHeader(buf []byte, schema string) []byte {
 
+	buf = append(buf, Theader)
 	buf = append(buf, MAGIC...)
+	buf = append(buf, Tversion)
 	buf = appendSize(buf, TSSD_VERSION)
 
 	buf = append(buf, byte(Tschema))
@@ -55,31 +58,31 @@ func appendHeader(buf []byte, schema string) []byte {
 }
 
 func isMagic(buf []byte) bool {
-	return buf[0] == MAGIC[0] && buf[1] == MAGIC[1] && buf[2] == MAGIC[2] && buf[3] == MAGIC[3]
+	return buf[0] == Theader && buf[1] == MAGIC[0] && buf[2] == MAGIC[1] && buf[3] == MAGIC[2]
 }
 
-// [TSSD][TSSD_VERSION][Tschema][string-size][xxxxxxx]
+// [TSSD][Tversion][TSSD_VERSION][Tschema][string-size][xxxxxxx]
 func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
-	if len(buf) < 9 {
+	if len(buf) < 10 {
 		return nil, buf, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
-	if !isMagic(buf) || buf[6] != byte(Tschema) {
-		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or schema %d invalid]", ErrorInvalidTSSDData, buf[6])
+	if !isMagic(buf) || buf[4] != byte(Tversion) || buf[7] != byte(Tschema) {
+		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or version: %d schema %d invalid]", ErrorInvalidTSSDData, buf[4], buf[7])
 	}
 
 	header = &Header{
 		Magic: [4]byte{'T', 'S', 'S', 'D'},
 	}
 
-	header.Version = dumpSize(buf[4:])
+	header.Version = dumpSize(buf[5:])
 
-	dsize := dumpSize(buf[7:])
+	dsize := dumpSize(buf[8:])
 	if dsize <= 0 {
 		return nil, buf, fmt.Errorf("%w [data version size invalid:%d]", ErrorInvalidTSSDData, dsize)
 	}
-	if len(buf[9:]) < int(dsize) {
+	if len(buf[10:]) < int(dsize) {
 		return nil, buf, fmt.Errorf("%w [data version]", ErrorInSufficientData)
 	}
-	header.Schema = string(buf[9 : 9+dsize])
-	return header, buf[9+dsize:], nil
+	header.Schema = string(buf[10 : 10+dsize])
+	return header, buf[10+dsize:], nil
 }
