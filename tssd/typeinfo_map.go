@@ -236,7 +236,7 @@ func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, dest []byte) ([]
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type))         //TmergeArray
+	dest = append(dest, byte(ti.Type))         //Tarraym
 	dest = append(dest, byte(ti.info[0].Type)) //Telement
 
 	totalSize := ti.info[0].size * arrayN
@@ -258,7 +258,7 @@ func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain 
 	}
 	var size int
 	switch int8(src[0]) {
-	case ti.Type: //src[0]:TmergeArray, src[1] Telement
+	case ti.Type: //src[0]:Tarraym, src[1] Telement
 		if len(src) < 4 {
 			//TODO, add field name info
 			return v, src, ErrorInSufficientData

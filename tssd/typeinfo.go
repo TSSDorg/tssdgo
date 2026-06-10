@@ -284,7 +284,7 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 	return src[3+size:], nil
 }
 
-//[TmergeArray][Ttype][size][arrayN][data]
+//[Tarraym][Ttype][size][arrayN][data]
 func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 	arrayN := ti.size
 	addr := Size_t(src)
@@ -313,7 +313,7 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 	}
 	var size int
 	switch int8(src[0]) {
-	case ti.Type: //[0]: TmergeArray, [1]: elementType
+	case ti.Type: //[0]: Tarraym, [1]: elementType
 		if len(src) < 4 {
 			//TODO, add field name info
 			return src, ErrorInSufficientData
@@ -560,7 +560,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		}
 
 		if ti.info[0].isFixedLength {
-			ti.setType(TmergeArray)
+			ti.setType(Tarraym)
 			ti.save = (*typeInfo).mergeSliceSave
 			ti.dump = (*typeInfo).mergeSliceDump
 			ti.mapSave, ti.mapDump = (*typeInfo).mapMergeSliceValueSave, (*typeInfo).mapMergeSliceValueDump

@@ -43,8 +43,6 @@ func TestMap2(t *testing.T) {
 
 	m3 := Ptr(&mi.m)
 
-	//var input interface{}
-	//input = mi
 	m := reflect.ValueOf(mi.MapPtr(m3)).Elem()
 	fmt.Println("testMap_basics:", m.Kind(), m.Type().Key(), m.Type().Elem())
 	if m.Kind() == reflect.Map {
@@ -261,7 +259,6 @@ func TestSaveDumpMapSimpleSlice(t *testing.T) {
 
 	c := parse(s1)
 	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
-	fmt.Println("TestSaveDumpMapSimpleSlice:", Tobject, Tdict, Tint64, Tstring, Tarray, TmergeArray, buf)
 
 	var s2 stmap
 	c.unmarshal(buf, &s2)
