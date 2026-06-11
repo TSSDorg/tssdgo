@@ -363,7 +363,9 @@ func (ti *typeInfo) dictSave(src Ptr, dest []byte) ([]byte, error) {
 
 	for _, k := range keys {
 		v := value.MapIndex(k)
+		dest = append(dest, byte(Tdictk))
 		dest, _ = ti.info[0].mapSave(&ti.info[0], k, dest)
+		dest = append(dest, byte(Tdictv))
 		dest, _ = ti.info[1].mapSave(&ti.info[1], v, dest)
 	}
 	appendSize(dest[:sizePos], len(dest)-sizePos-2) //object size exclude size self(2bytes)
@@ -402,11 +404,21 @@ func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
 			key := reflect.New(ktype).Elem()
 			value := reflect.New(vtype).Elem()
 
+			if buf[0] != byte(Tdictk) {
+				return src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictk, buf[0])
+			}
+			buf = buf[1:]
+
 			kk, buf, err = ti.info[0].mapDump(&ti.info[0], buf)
 			if err != nil {
 				return src, err
 			}
 			key.Set(kk.Convert(ktype))
+
+			if buf[0] != byte(Tdictv) {
+				return src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictv, buf[0])
+			}
+			buf = buf[1:]
 
 			vv, buf, err = ti.info[1].mapDump(&ti.info[1], buf)
 			if err != nil {
