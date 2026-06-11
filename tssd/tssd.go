@@ -29,6 +29,8 @@ const (
 	Tarraym //merged array, elements including 1 simple fixed length data only
 	Tobject //struct
 	Tdict   //map, pairs of (key, value)
+	Tdictk   //key of a map node
+	Tdictv   //value of a map node
 	Traw    //raw binary data
 	Tschema = 83 //'S' schema meta data string
 	Theader   = 84 //'T' tssd header
