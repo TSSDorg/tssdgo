@@ -5,14 +5,18 @@ import (
 	"fmt"
 )
 
-// data type define
 const (
 	MAGIC               = "SSD"
 	TSSD_VERSION        = 1
 	TSSD_FLAT_KIND      = "tssd.Flat"
 	TSSD_TIME_KIND      = "time.Time"
-	Tbase          int8 = iota + 10
-	Tbool               //fix-length-data
+)
+
+type Ttype int8
+// data type define
+const (
+	Tbase          int8 = 10 + iota
+	Tbool                       //fix-length-data
 	Tint8
 	Tuint8
 	Tint16
@@ -25,6 +29,7 @@ const (
 	Tfloat64
 	Tstring //dynamic length data
 	Ttime   //RFC3339Nano string
+	Tenum
 	Tarray
 	Tarraym //merged array, elements including 1 simple fixed length data only
 	Tobject //struct
