@@ -6,17 +6,18 @@ import (
 )
 
 const (
-	MAGIC               = "SSD"
-	TSSD_VERSION        = 1
-	TSSD_FLAT_KIND      = "tssd.Flat"
-	TSSD_TIME_KIND      = "time.Time"
+	MAGIC          = "SSD"
+	TSSD_VERSION   = 1
+	TSSD_FLAT_KIND = "tssd.Flat"
+	TSSD_TIME_KIND = "time.Time"
 )
 
 type Ttype int8
+
 // data type define
 const (
-	Tbase          int8 = 10 + iota
-	Tbool                       //fix-length-data
+	Tbase int8 = 10 + iota
+	Tbool      //fix-length-data
 	Tint8
 	Tuint8
 	Tint16
@@ -31,16 +32,16 @@ const (
 	Ttime   //RFC3339Nano string
 	Tenum
 	Tarray
-	Tarraym //merged array, elements including 1 simple fixed length data only
-	Tobject //struct
-	Tdict   //map, pairs of (key, value)
-	Tdictk   //key of a map node
-	Tdictv   //value of a map node
-	Traw    //raw binary data
-	Tschema = 83 //'S' schema meta data string
-	Theader   = 84 //'T' tssd header
-	Tversion= 86 //'V' tssd format version
-	Tuser = 0xEF //user define data
+	Tarraym         //merged array, elements including 1 simple fixed length data only
+	Tobject         //struct
+	Tdict           //map, pairs of (key, value)
+	Tdictk          //key of a map node
+	Tdictv          //value of a map node
+	Traw            //raw binary data
+	Tschema  = 83   //'S' schema meta data string
+	Theader  = 84   //'T' tssd header
+	Tversion = 86   //'V' tssd format version
+	Tuser    = 0xEF //user define data
 )
 
 var ErrorInvalidTSSDVersion = errors.New("TSSD version invalid or too new to process")
@@ -57,22 +58,21 @@ type Header struct {
 }
 
 type Schema struct {
-	Hash string
-	Type string
+	Hash    string
+	Type    string
 	Content string
 }
-
 
 func init() {
 	schemaTypeInfo = parse(Schema{})
 }
 
-func (this *Schema)Marshal(to []byte) (ret []byte) {
+func (this *Schema) Marshal(to []byte) (ret []byte) {
 	ret, _ = schemaTypeInfo.marshal(this, to)
 	return ret
 }
 
-func (this *Schema)Unmarshal(from []byte) (remain []byte, err error) {
+func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
 	return schemaTypeInfo.unmarshal(from, this)
 }
 
@@ -100,7 +100,7 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or version: %d schema %d invalid]", ErrorInvalidTSSDData, buf[4], buf[7])
 	}
 
-	header = &Header {
+	header = &Header{
 		Magic: [4]byte{'T', 'S', 'S', 'D'},
 		//Schema: &schema,
 	}

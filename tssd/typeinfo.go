@@ -284,7 +284,7 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 	return src[3+size:], nil
 }
 
-//[Tarraym][Ttype][size][arrayN][data]
+// [Tarraym][Ttype][size][arrayN][data]
 func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 	arrayN := ti.size
 	addr := Size_t(src)

@@ -210,8 +210,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 func (info *typeInfo) print(data []byte) {
 
 	fmt.Printf("==TType list: Tbool: %d, Tint64: %d, Tfloat64: %d, Tstring: %d, Tarray: %d, Tarraym: %d, Ttime: %d, Tenum: %d, Tobject: %d, Tdict: %d==\n",
-				Tbool, Tint64, Tfloat64, Tstring, Tarray, Tarraym, Ttime, Tenum, Tobject, Tdict)
-
+		Tbool, Tint64, Tfloat64, Tstring, Tarray, Tarraym, Ttime, Tenum, Tobject, Tdict)
 
 	root := &Node{
 		Content: fmt.Sprintf("root-%s(%s)", info.name, info.rtype.String()),
@@ -221,7 +220,7 @@ func (info *typeInfo) print(data []byte) {
 	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
 }
 
-//print your tssd []byte
+// print your tssd []byte
 func (factory Factory) Print(version string, data []byte) {
 	//factory.versions[version].info.print(data)
 

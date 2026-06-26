@@ -39,7 +39,7 @@ type Flatable interface {
 	//but you need override OnHeader too
 	Schema(Factory) Schema
 
-	//when read/received a TSSD header, parse TSSD version and 
+	//when read/received a TSSD header, parse TSSD version and
 	//parse schema and validate you received
 	//return none-nil error will block factory to Unmarsh
 	OnHeader(header Header) (err error)
@@ -47,7 +47,7 @@ type Flatable interface {
 	//the current version or class name of the object
 	Version() string
 
-	//Progeny or Successor of current version 
+	//Progeny or Successor of current version
 	//which version it can upgrade to after Decorate
 	//default it should return "", which means latest
 	Progeny() string
@@ -90,7 +90,7 @@ func (this *Flat[T, PT]) Hash(types []byte) string {
 }
 
 func (this *Flat[T, PT]) Schema(factory Factory) Schema {
-	return Schema {
+	return Schema{
 		this.Hash(this.Types(factory)),
 		"",
 		"",
@@ -98,7 +98,7 @@ func (this *Flat[T, PT]) Schema(factory Factory) Schema {
 }
 
 // we need user can override it
-func (this *Flat[T, PT]) OnHeader(header Header) (error) {
+func (this *Flat[T, PT]) OnHeader(header Header) error {
 	return nil
 }
 
@@ -141,14 +141,13 @@ func (factory Factory) Register(flat Flatable) {
 
 func (factory Factory) Validate(header Header) error {
 	if header.Version != TSSD_VERSION {
-		return ErrorInvalidTSSDVersion 
+		return ErrorInvalidTSSDVersion
 	}
 	if _, ok := factory.schemas[header.Schema.Hash]; !ok {
 		return ErrorTSSDDataSchemaReject
 	}
 	return nil
 }
-
 
 func (factory Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	bi, ok := factory.versions[flat.Version()]
@@ -241,7 +240,7 @@ func (factory Factory) Unmarshal(src []byte) (Flatable, []byte, error) {
 	if err := factory.Validate(*header); err != nil {
 		return nil, src, err
 	}
-	
+
 	if err := factory.versions[factory.current].builder.OnHeader(*header); err != nil {
 		return nil, src, err
 	}
