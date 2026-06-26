@@ -69,7 +69,7 @@ func parseMergeArray(info *typeInfo, ttype int8, buf []byte) string {
 
 func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 	if info.Type != int8(buf[0]) && -info.Type != int8(buf[0]) {
-		fmt.Println("type mismatch ", info.Type, buf[0])
+		fmt.Println("print parsetype mismatch ", info.Type, buf[0])
 		return buf
 	}
 
@@ -196,8 +196,8 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 				Content: fmt.Sprintf("KVNode[%d]", k),
 			}
 			node.Children = append(node.Children, kvNode)
-			remain = info.info[0].parse(kvNode, remain)
-			remain = info.info[1].parse(kvNode, remain)
+			remain = info.info[0].parse(kvNode, remain[1:])
+			remain = info.info[1].parse(kvNode, remain[1:])
 		}
 
 		return remain
@@ -208,6 +208,10 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 }
 
 func (info *typeInfo) print(data []byte) {
+
+	fmt.Printf("==TType list: Tbool: %d, Tint64: %d, Tfloat64: %d, Tstring: %d, Tarray: %d, Tarraym: %d, Ttime: %d, Tenum: %d, Tobject: %d, Tdict: %d==\n",
+				Tbool, Tint64, Tfloat64, Tstring, Tarray, Tarraym, Ttime, Tenum, Tobject, Tdict)
+
 
 	root := &Node{
 		Content: fmt.Sprintf("root-%s(%s)", info.name, info.rtype.String()),
@@ -234,7 +238,7 @@ func (factory Factory) Print(version string, data []byte) {
 		Children: []*Node{
 			&Node{Content: fmt.Sprintf("Magic([4]byte):{%s}", string(header.Magic[:]))},
 			&Node{Content: fmt.Sprintf("Version(int16):{%d}", header.Version)},
-			&Node{Content: fmt.Sprintf("Schema:{%s}", header.Schema)},
+			&Node{Content: fmt.Sprintf("Schema:{%s %s %s}", header.Schema.Hash, header.Schema.Type, header.Schema.Content)},
 		},
 	}
 
