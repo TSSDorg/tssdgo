@@ -2,7 +2,6 @@ package tssd_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	tssd "github.com/tssdorg/tssdgo/tssd"
@@ -39,16 +38,21 @@ func (this *worker_V2) Progeny() string {
 	return "worker_V3"
 }
 
-func (this *worker_V2) Schema(factory tssd.Factory) string {
-	return this.Version() + "-" + this.Hash(this.Types(factory))
+func (this *worker_V2) Schema(factory tssd.Factory) tssd.Schema {
+	return tssd.Schema {
+		this.Hash(this.Types(factory)),
+		"json",  
+		"jsonstring",
+	}
 }
 
-func (this *worker_V2) OnSchema(factory tssd.Factory, schema string) (hash string, err error) {
-	 ss := strings.Split(schema, "-")
-	 if len(ss) != 2 {
-		return "", tssd.ErrorTSSDDataSchemaReject
-	 }
-	 return ss[1], nil
+func (this *worker_V2) OnHeader(header tssd.Header) (err error) {
+	//
+	fmt.Println("header version: {}", header.Version)
+
+	 //and you can get the extend info in header.Schema which from peer
+	 fmt.Println("schema type: {}, content: {}", header.Schema.Type, header.Schema.Content)
+	 return nil
 }
 
 ////////////////////////////the worker V1////////////////////////////////////
@@ -69,16 +73,19 @@ func (this *worker_V1) Progeny() string {
 	return "worker_V2"
 }
 
-func (this *worker_V1) Schema(factory tssd.Factory) string {
-	return this.Version() + "-" + this.Hash(this.Types(factory))
+func (this *worker_V1) Schema(factory tssd.Factory) tssd.Schema {
+	return tssd.Schema {
+		this.Hash(this.Types(factory)),
+		"schema-type",  
+		"blablabla...",
+	}
 }
 
-func (this *worker_V1) OnSchema(factory tssd.Factory, schema string) (hash string, err error) {
-	 ss := strings.Split(schema, "-")
-	 if len(ss) != 2 {
-		return "", tssd.ErrorTSSDDataSchemaReject
-	 }
-	 return ss[1], nil
+func (this *worker_V1) OnHeader(header tssd.Header) (err error) {
+	 //and you can get the extend info in header.Schema which from peer
+	 //maybe it's "blabla.."
+	 fmt.Println("schema type: {}, content: {}", header.Schema.Type, header.Schema.Content)
+	 return nil
 }
 
 //test V1->V2
