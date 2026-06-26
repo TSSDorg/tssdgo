@@ -38,17 +38,40 @@ const (
 	Tuser = 0xEF //user define data
 )
 
+var ErrorInvalidTSSDVersion = errors.New("TSSD version invalid or too new to process")
 var ErrorInvalidTSSDData = errors.New("TSSD data invalid format error or damaged")
 var ErrorInSufficientData = errors.New("Need more data to process")
 var ErrorTSSDDataSchemaReject = errors.New("TSSD data schema not match")
 
+var schemaTypeInfo *typeInfo
+
 type Header struct {
 	Magic   [4]byte
 	Version int16
-	Schema  string // string content
+	Schema  Schema
 }
 
-func appendHeader(buf []byte, schema string) []byte {
+type Schema struct {
+	Hash string
+	Type string
+	Content string
+}
+
+
+func init() {
+	schemaTypeInfo = parse(Schema{})
+}
+
+func (this *Schema)Marshal(to []byte) (ret []byte) {
+	ret, _ = schemaTypeInfo.marshal(this, to)
+	return ret
+}
+
+func (this *Schema)Unmarshal(from []byte) (remain []byte, err error) {
+	return schemaTypeInfo.unmarshal(from, this)
+}
+
+func appendHeader(buf []byte, schema Schema) []byte {
 
 	buf = append(buf, Theader)
 	buf = append(buf, MAGIC...)
@@ -56,7 +79,7 @@ func appendHeader(buf []byte, schema string) []byte {
 	buf = appendSize(buf, TSSD_VERSION)
 
 	buf = append(buf, byte(Tschema))
-	return appendString(buf, schema)
+	return schema.Marshal(buf)
 }
 
 func isMagic(buf []byte) bool {
@@ -72,19 +95,16 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or version: %d schema %d invalid]", ErrorInvalidTSSDData, buf[4], buf[7])
 	}
 
-	header = &Header{
+	header = &Header {
 		Magic: [4]byte{'T', 'S', 'S', 'D'},
+		//Schema: &schema,
 	}
 
 	header.Version = dumpSize(buf[5:])
 
-	dsize := dumpSize(buf[8:])
-	if dsize <= 0 {
-		return nil, buf, fmt.Errorf("%w [data version size invalid:%d]", ErrorInvalidTSSDData, dsize)
+	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
+		return nil, buf, err
 	}
-	if len(buf[10:]) < int(dsize) {
-		return nil, buf, fmt.Errorf("%w [data version]", ErrorInSufficientData)
-	}
-	header.Schema = string(buf[10 : 10+dsize])
-	return header, buf[10+dsize:], nil
+
+	return
 }
