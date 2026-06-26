@@ -5,14 +5,19 @@ import (
 	"fmt"
 )
 
+const (
+	MAGIC          = "SSD"
+	TSSD_VERSION   = 1
+	TSSD_FLAT_KIND = "tssd.Flat"
+	TSSD_TIME_KIND = "time.Time"
+)
+
+type Ttype int8
+
 // data type define
 const (
-	MAGIC               = "SSD"
-	TSSD_VERSION        = 1
-	TSSD_FLAT_KIND      = "tssd.Flat"
-	TSSD_TIME_KIND      = "time.Time"
-	Tbase          int8 = iota + 10
-	Tbool               //fix-length-data
+	Tbase int8 = 10 + iota
+	Tbool      //fix-length-data
 	Tint8
 	Tuint8
 	Tint16
@@ -25,30 +30,53 @@ const (
 	Tfloat64
 	Tstring //dynamic length data
 	Ttime   //RFC3339Nano string
+	Tenum
 	Tarray
-	Tarraym //merged array, elements including 1 simple fixed length data only
-	Tobject //struct
-	Tdict   //map, pairs of (key, value)
-	Tdictk   //key of a map node
-	Tdictv   //value of a map node
-	Traw    //raw binary data
-	Tschema = 83 //'S' schema meta data string
-	Theader   = 84 //'T' tssd header
-	Tversion= 86 //'V' tssd format version
-	Tuser = 0xEF //user define data
+	Tarraym         //merged array, elements including 1 simple fixed length data only
+	Tobject         //struct
+	Tdict           //map, pairs of (key, value)
+	Tdictk          //key of a map node
+	Tdictv          //value of a map node
+	Traw            //raw binary data
+	Tschema  = 83   //'S' schema meta data string
+	Theader  = 84   //'T' tssd header
+	Tversion = 86   //'V' tssd format version
+	Tuser    = 0xEF //user define data
 )
 
+var ErrorInvalidTSSDVersion = errors.New("TSSD version invalid or too new to process")
 var ErrorInvalidTSSDData = errors.New("TSSD data invalid format error or damaged")
 var ErrorInSufficientData = errors.New("Need more data to process")
 var ErrorTSSDDataSchemaReject = errors.New("TSSD data schema not match")
 
+var schemaTypeInfo *typeInfo
+
 type Header struct {
 	Magic   [4]byte
 	Version int16
-	Schema  string // string content
+	Schema  Schema
 }
 
-func appendHeader(buf []byte, schema string) []byte {
+type Schema struct {
+	Hash    string
+	Type    string
+	Content string
+}
+
+func init() {
+	schemaTypeInfo = parse(Schema{})
+}
+
+func (this *Schema) Marshal(to []byte) (ret []byte) {
+	ret, _ = schemaTypeInfo.marshal(this, to)
+	return ret
+}
+
+func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
+	return schemaTypeInfo.unmarshal(from, this)
+}
+
+func appendHeader(buf []byte, schema Schema) []byte {
 
 	buf = append(buf, Theader)
 	buf = append(buf, MAGIC...)
@@ -56,7 +84,7 @@ func appendHeader(buf []byte, schema string) []byte {
 	buf = appendSize(buf, TSSD_VERSION)
 
 	buf = append(buf, byte(Tschema))
-	return appendString(buf, schema)
+	return schema.Marshal(buf)
 }
 
 func isMagic(buf []byte) bool {
@@ -74,17 +102,14 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 
 	header = &Header{
 		Magic: [4]byte{'T', 'S', 'S', 'D'},
+		//Schema: &schema,
 	}
 
 	header.Version = dumpSize(buf[5:])
 
-	dsize := dumpSize(buf[8:])
-	if dsize <= 0 {
-		return nil, buf, fmt.Errorf("%w [data version size invalid:%d]", ErrorInvalidTSSDData, dsize)
+	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
+		return nil, buf, err
 	}
-	if len(buf[10:]) < int(dsize) {
-		return nil, buf, fmt.Errorf("%w [data version]", ErrorInSufficientData)
-	}
-	header.Schema = string(buf[10 : 10+dsize])
-	return header, buf[10+dsize:], nil
+
+	return
 }

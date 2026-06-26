@@ -12,7 +12,7 @@ type BuildFunc = func() Flatable
 type buildInfo struct {
 	version string //current version
 	progeny string //which version it can upgrade after decoration
-	schema  string //current schema
+	schema  Schema //current schema
 	hash    string
 	info    *typeInfo
 	builder Flatable //keep it as builder
@@ -36,13 +36,13 @@ type Flatable interface {
 
 	//schema write in the TSSD header
 	//you can override it to add more infos such as a big json object string
-	//but you need override OnSchema too
-	Schema(Factory) string
+	//but you need override OnHeader too
+	Schema(Factory) Schema
 
-	//parse schema you received and return hash
-	//Or process and do other checks when you write other info in schema
+	//when read/received a TSSD header, parse TSSD version and
+	//parse schema and validate you received
 	//return none-nil error will block factory to Unmarsh
-	OnSchema(factory Factory, schema string) (hash string, err error)
+	OnHeader(header Header) (err error)
 
 	//the current version or class name of the object
 	Version() string
@@ -89,13 +89,17 @@ func (this *Flat[T, PT]) Hash(types []byte) string {
 	return hashString[:5] + hashString[l-5:l]
 }
 
-func (this *Flat[T, PT]) Schema(factory Factory) string {
-	return this.Hash(this.Types(factory))
+func (this *Flat[T, PT]) Schema(factory Factory) Schema {
+	return Schema{
+		this.Hash(this.Types(factory)),
+		"",
+		"",
+	}
 }
 
-// we need let user can override it
-func (this *Flat[T, PT]) OnSchema(factory Factory, schema string) (hash string, err error) {
-	return schema, nil
+// we need user can override it
+func (this *Flat[T, PT]) OnHeader(header Header) error {
+	return nil
 }
 
 func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
@@ -130,9 +134,19 @@ func (factory Factory) Register(flat Flatable) {
 
 	factory.versions[flat.Version()] = bi
 	bi.schema = flat.Schema(factory)
-	hash, _ := flat.OnSchema(factory, bi.schema)
+	hash := bi.schema.Hash
 	bi.hash = hash
 	factory.schemas[hash] = bi
+}
+
+func (factory Factory) Validate(header Header) error {
+	if header.Version != TSSD_VERSION {
+		return ErrorInvalidTSSDVersion
+	}
+	if _, ok := factory.schemas[header.Schema.Hash]; !ok {
+		return ErrorTSSDDataSchemaReject
+	}
+	return nil
 }
 
 func (factory Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
@@ -141,7 +155,7 @@ func (factory Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 		return nil, ErrorTSSDDataSchemaReject
 	}
 
-	dest = appendHeader(dest, factory.versions[flat.Version()].schema)
+	dest = appendHeader(dest, flat.Schema(factory))
 	return bi.info.marshal(flat, dest)
 }
 
@@ -163,10 +177,14 @@ func (factory Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 		return src, err
 	}
 
-	remoteHash, err := dest.OnSchema(factory, header.Schema)
-	if err != nil {
+	if err := factory.Validate(*header); err != nil {
 		return src, err
 	}
+
+	if err := dest.OnHeader(*header); err != nil {
+		return src, err
+	}
+	remoteHash := header.Schema.Hash
 
 	//local := dest.Schema(factory)   //default it new objct, so we fetch it
 	local := factory.versions[dest.Version()].hash
@@ -219,10 +237,14 @@ func (factory Factory) Unmarshal(src []byte) (Flatable, []byte, error) {
 		return nil, src, err
 	}
 
-	remoteHash, err := factory.versions[factory.current].builder.OnSchema(factory, header.Schema)
-	if err != nil {
+	if err := factory.Validate(*header); err != nil {
 		return nil, src, err
 	}
+
+	if err := factory.versions[factory.current].builder.OnHeader(*header); err != nil {
+		return nil, src, err
+	}
+	remoteHash := header.Schema.Hash
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
