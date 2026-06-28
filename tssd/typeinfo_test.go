@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 	"time"
-	//"unsafe"
+	"unsafe"
 	//"strconv"
 	//"assert"
 	//tssd "github.com/simpleKV/tssd/tssd"
@@ -833,6 +833,49 @@ func TestAllBasicTypeInStruct(t *testing.T) {
 		t.Error("testAllBasicTypeInStruct unmarshal failed")
 	}
 }
+
+func TestAllBasicTypeInStructArray(t *testing.T) {
+	var in, out [3]allBasicType
+	ti := parse(in)
+
+	for i:=0; i<3; i++ {
+		(&in[i]).rand()
+	}
+
+	dest, _ := ti.marshal(Ptr(&in[0]), make([]byte, 0, 2048))
+	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
+
+	ti.unmarshal(dest, Ptr(&out))
+	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
+	if !reflect.DeepEqual(in, out) {
+		t.Error("testAllBasicTypeInStruct unmarshal failed")
+	}
+}
+
+func TestAllBasicTypeInStructSlice(t *testing.T) {
+	var in, out []allBasicType
+	ti := parse(in)
+
+	in = make([]allBasicType, 1)
+
+	for i:=0; i<1; i++ {
+		(&in[i]).rand()
+	}
+
+	fmt.Println("TestAllBasicTypeInStructSlice len:", len(in), " sizeof:", unsafe.Sizeof(in[0]))
+
+	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
+
+	ti.unmarshal(dest, Ptr(&out))
+	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
+	if !reflect.DeepEqual(in, out) {
+		t.Error("TestAllBasicTypeInStructSlice unmarshal failed")
+	}
+}
+
+
+
 
 func TestTssdArray(t *testing.T) {
 	var array = [4]int16{1, 2, 3, 4}
