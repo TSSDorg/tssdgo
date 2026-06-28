@@ -53,7 +53,7 @@ var schemaTypeInfo *typeInfo
 
 type Header struct {
 	Magic   [4]byte
-	Version int16
+	Version uint16
 	Schema  Schema
 }
 

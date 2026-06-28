@@ -40,11 +40,11 @@ func Slice(k Ptr, size Size_t) []byte {
 }
 
 func appendSize(dest []byte, le int) []byte {
-	l := int16(le)
+	l := uint16(le)
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
 }
 
-func dumpSize(src []byte) (size int16) {
+func dumpSize(src []byte) (size uint16) {
 	copy(Slice(Ptr(&size), unsafe.Sizeof(size)), src)
 	return size
 }
@@ -168,6 +168,7 @@ func (ti *typeInfo) objSave(src Ptr, dest []byte) ([]byte, error) {
 	dest = appendSize(dest, 0)            //reserved total Size (S)
 	dest = appendSize(dest, len(ti.info)) //S
 	for i := range len(ti.info) {
+		fmt.Println("objSave:", i)
 		dest, _ = ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), dest)
 	}
 	appendSize(dest[:sizePos], len(dest)-sizePos-2) //object size exclude size self(2bytes)
@@ -218,6 +219,7 @@ func (ti *typeInfo) sliceSave(src Ptr, dest []byte) ([]byte, error) {
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
 		p := *(*[]byte)(src)
+		fmt.Println("sliceSave len:", len(p))
 		if arrayN = len(p); arrayN > 0 {
 			addr = Size_t(Ptr(&p[0]))
 		}
@@ -387,6 +389,7 @@ func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
 			return src, ErrorInSufficientData
 		}
 		size = int(dumpSize(src[1:]))
+		fmt.Println("dictDump dump size:", size)
 		if len(src) < 3+size {
 			//TODO, add field name info
 			return src, ErrorInSufficientData
@@ -437,6 +440,7 @@ func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
 	default:
 		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
 	}
+	fmt.Println("dictDump:", len(src), size)
 	return src[3+size:], nil
 
 }
