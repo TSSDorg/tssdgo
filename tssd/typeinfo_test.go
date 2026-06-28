@@ -2,6 +2,7 @@ package tssd
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 	"time"
@@ -10,7 +11,6 @@ import (
 	//"assert"
 	//tssd "github.com/simpleKV/tssd/tssd"
 )
-
 
 type S1 struct {
 	T   time.Time
@@ -82,7 +82,7 @@ func TestStringSlice(t *testing.T) {
 	}
 	var s2 ss
 	container := parse(sin1)
-	buf, _:= container.marshal(&sin1, make([]byte, 0, 2048))
+	buf, _ := container.marshal(&sin1, make([]byte, 0, 2048))
 
 	container.unmarshal(buf, &s2)
 	if !reflect.DeepEqual(sin1, s2) {
@@ -115,7 +115,6 @@ func TestStringArray(t *testing.T) {
 	}
 }
 
-
 func TestSliceXXX(t *testing.T) {
 
 	type ss struct {
@@ -131,7 +130,7 @@ func TestSliceXXX(t *testing.T) {
 		[]byte("hello world"),
 	}
 	var s2 ss
-	
+
 	container := parse(in1)
 	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
 	fmt.Println("=========================TestSlice================================", n)
@@ -151,14 +150,12 @@ func TestSliceXXX(t *testing.T) {
 	}
 }
 
-
 func TestSliceUint(t *testing.T) {
 
-	
 	in1 := []int8{1, 2, 3, 5, 4}
 
 	var s2 []int8
-	
+
 	container := parse(in1)
 	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
 	fmt.Println(s2)
@@ -171,7 +168,6 @@ func TestSliceUint(t *testing.T) {
 		t.Errorf("Test String slice err ")
 	}
 }
-
 
 func TestSlice(t *testing.T) {
 
@@ -188,7 +184,7 @@ func TestSlice(t *testing.T) {
 		[]byte("hello world"),
 	}
 	var s2 ss
-	
+
 	container := parse(in1)
 	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
 	fmt.Println("=========================TestSlice================================", n)
@@ -198,7 +194,7 @@ func TestSlice(t *testing.T) {
 		fmt.Println(in1, s2)
 		t.Errorf("Test String slice err ")
 	}
-	
+
 	in1 = ss{
 		[]int{},
 		[]string{},
@@ -209,11 +205,10 @@ func TestSlice(t *testing.T) {
 
 	container.unmarshal(n, &s2)
 	fmt.Println("Test slice:", len(s2.I), len(s2.Strs), len(s2.I64), len(s2.B))
-	if len(s2.I) > 0 || len(s2.Strs) > 0 || len(s2.I64) > 0 || len(s2.B) > 0{
+	if len(s2.I) > 0 || len(s2.Strs) > 0 || len(s2.I64) > 0 || len(s2.B) > 0 {
 		t.Errorf("Test slice err:")
 	}
 }
-
 
 func TestArray(t *testing.T) {
 
@@ -302,7 +297,6 @@ func TestNestStructSlice(t *testing.T) {
 	}
 }
 
-
 func TestEmptySlice(t *testing.T) {
 
 	type sin struct {
@@ -320,7 +314,7 @@ func TestEmptySlice(t *testing.T) {
 	var s2 sin
 	container := parse(in1)
 	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
-	
+
 	container.unmarshal(n, &s2)
 	fmt.Println("in1:", in1)
 	fmt.Println("out:", s2)
@@ -329,7 +323,6 @@ func TestEmptySlice(t *testing.T) {
 		t.Errorf("Test TestEmptySlice err ")
 	}
 }
-
 
 func TestNestStructArray(t *testing.T) {
 
@@ -445,7 +438,6 @@ func TestEmbedStruct(t *testing.T) {
 		t.Error("TestTime failed")
 	}
 }
-
 
 func TestTime(t *testing.T) {
 
@@ -639,12 +631,10 @@ func TestParse(t *testing.T) {
 	}
 }
 
-
 type stx struct {
 	I uint16
 	S string
 }
-
 
 func testBody[T comparable](in T, t *testing.T) {
 	ti := parse(in)
@@ -665,7 +655,7 @@ func equalSlice[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i := 0; i<len(a); i++ {
+	for i := 0; i < len(a); i++ {
 		if a[i] != b[i] {
 			return false
 		}
@@ -699,30 +689,30 @@ func testBasicAll[T comparable](in []T, t *testing.T) {
 	testBasicInMap(in, in, t)
 }
 
-
 func TestTssdAll(t *testing.T) {
 	testBasicAll([]bool{true, false}, t)
 	testBasicAll([]int8{0, -1, 1, 127, -128, 100, -35}, t)
 	testBasicAll([]uint8{0, 1, 127, 255, 100}, t)
-	testBasicAll([]uint16{0, 1, 127, 255, 12345, 0xFFFF}, t) 
+	testBasicAll([]uint16{0, 1, 127, 255, 12345, 0xFFFF}, t)
 	testBasicAll([]int16{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF}, t)
 
 	testBasicAll([]uint32{0, 1, 127, 255, 12345, 0xFFFF, 0xFFFFFFFF}, t)
 	testBasicAll([]int32{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF, 0x7FFFFFFF, -0x7FFFFFFF}, t)
 
 	testBasicAll([]uint64{0, 1, 127, 255, 12345, 0xFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF}, t)
-	testBasicAll([]int64{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF, 0x7FFFFFFF, 
+	testBasicAll([]int64{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF, 0x7FFFFFFF,
 		-0x7FFFFFFF, 0x7FFFFFFFFFFFFFFF, -0x7FFFFFFFFFFFFFFF}, t)
 	testBasicAll([]uint{0, 1, 127, 255, 12345, 0xFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF}, t)
-	testBasicAll([]int{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF, 0x7FFFFFFF, 
+	testBasicAll([]int{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF, 0x7FFFFFFF,
 		-0x7FFFFFFF, 0x7FFFFFFFFFFFFFFF, -0x7FFFFFFFFFFFFFFF}, t)
-	
+
 	testBasicAll([]float32{0.0, -1.23, 134.5, 12345.7890, -12898.0000}, t)
 	testBasicAll([]float64{0.0, -9.23, 134.5, 123456789.7890, -12898786544444444.0000}, t)
-	testBasicAll([]string {
+	testBasicAll([]string{
 		"",
 		"a",
 		" ",
+		"           ",
 		"",
 		"a1",
 		"aA",
@@ -751,12 +741,10 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 		}
 	}
 	for i := range in {
-		fn(&st[T]{Value: in[i],})
+		fn(&st[T]{Value: in[i]})
 	}
 	fn(&st[T]{Slice: in})
 }
-
-
 
 func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
 	var m = make(map[T]V, 0)
@@ -767,12 +755,84 @@ func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
 		dest, _ := ti.marshal(Ptr(&m), make([]byte, 0, 2048))
 		var out map[T]V
 		ti.unmarshal(dest, Ptr(&out))
-		if  !reflect.DeepEqual(m, out) {
+		if !reflect.DeepEqual(m, out) {
 			t.Error("testBasicInMap failed")
 		}
 	}
 }
 
+type allBasicType struct {
+	//we random the order
+	Vuint32  uint32
+	Vfloat64 float64
+	Vuint8   uint8
+	Vstring  string
+	Vuint16  uint16
+	Vint32   int32
+	Vint64   int64
+	Vbool    bool
+	Vint16   int16
+	Vuint64  uint64
+	Vfloat32 float32
+	Vint8    int8
+}
+
+func randBytes(n int) []byte {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	ret := make([]byte, 0, n)
+	for i := 0; i < n; i++ {
+		ret = append(ret, uint8(r.Intn(255)))
+	}
+	return ret
+}
+
+const (
+	minUint32 = uint32(0)
+	maxUint32 = ^uint32(0)
+
+	minUint64 = uint64(0)
+	maxUint64 = ^uint64(0)
+
+	minInt32 = int32(-maxInt32 - 1)
+	maxInt32 = int32(maxUint32 >> 1)
+
+	minInt64 = int64(-maxInt64 - 1)
+	maxInt64 = int64(maxUint64 >> 1)
+)
+
+func (this *allBasicType) rand() {
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	this.Vbool = []bool{true, false}[r.Intn(10)%2]
+	this.Vint8 = int8(r.Intn(255) - 128)
+	this.Vuint8 = uint8(r.Intn(255))
+	this.Vint16 = int16(r.Intn(0xFFFF) - (0xFFFF/2 + 1))
+	this.Vuint16 = uint16(r.Intn(0xFFFF))
+	this.Vint32 = int32(r.Intn(0xFFFFFFFF) - (0xFFFFFFFF/2 + 1))
+	this.Vuint32 = uint32(r.Intn(0xFFFFFFFF))
+
+	this.Vint64 = r.Int63() - int64(maxUint64/2)
+	this.Vuint64 = uint64(r.Int63() * 2)
+	this.Vstring = string(randBytes(r.Intn(255)))
+	this.Vfloat32 = r.Float32()
+	this.Vfloat64 = r.Float64()
+}
+
+func TestAllBasicTypeInStruct(t *testing.T) {
+	var in, out allBasicType
+	ti := parse(in)
+
+	(&in).rand()
+
+	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
+
+	ti.unmarshal(dest, Ptr(&out))
+	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
+	if !reflect.DeepEqual(in, out) {
+		t.Error("testAllBasicTypeInStruct unmarshal failed")
+	}
+}
 
 func TestTssdArray(t *testing.T) {
 	var array = [4]int16{1, 2, 3, 4}
@@ -876,7 +936,7 @@ func TestTssdMapStructSlice(t *testing.T) {
 }
 
 func TestTssdMapSliceValue(t *testing.T) {
-	var mp = map[string][]string {
+	var mp = map[string][]string{
 		"12":  {"345", "hello"},
 		"foo": {"6789", "bar"},
 	}
