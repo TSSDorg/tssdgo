@@ -687,6 +687,12 @@ func testBasicAll[T comparable](in []T, t *testing.T) {
 	testBasicAndArray(in, t)
 	testBasicInStruct(in, t)
 	testBasicInMap(in, in, t)
+
+	inAll := make([]allBasicType,  len(in))
+	for i:=0; i<len(in); i++ {
+		(&inAll[i]).rand()
+	}
+	testBasicInMap(in, inAll, t)
 }
 
 func TestTssdAll(t *testing.T) {
