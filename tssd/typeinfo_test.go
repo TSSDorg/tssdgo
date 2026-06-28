@@ -862,9 +862,12 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 	var in, out []allBasicType
 	ti := parse(in)
 
-	in = make([]allBasicType, 1)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	n := r.Intn(128)
 
-	for i:=0; i<1; i++ {
+	in = make([]allBasicType, n)
+
+	for i:=0; i<n; i++ {
 		(&in[i]).rand()
 	}
 
