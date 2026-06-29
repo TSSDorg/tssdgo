@@ -104,6 +104,28 @@ type stmap struct {
 	M map[string]stin
 }
 
+/*
+func TestSaveDumpEmptyMapStruct(t *testing.T) {
+	fmt.Println("TestSaveDumpMapStruct")
+
+	s1 := stmap{}
+	s1.I  = 1
+	s1.M = nil
+
+	c := parse(s1)
+	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	fmt.Println(c)
+
+	var s2 stmap
+	c.unmarshal(buf, &s2)
+
+	fmt.Println(s1, s2)
+	if !reflect.DeepEqual(s1, s2) {
+		t.Error("TestSaveDumpMapStruct error:", s1, s2)
+	}
+}
+*/
+
 func TestSaveDumpMapStruct(t *testing.T) {
 	fmt.Println("TestSaveDumpMapStruct")
 
@@ -243,7 +265,6 @@ func TestSaveDumpMapString(t *testing.T) {
 }
 
 func TestSaveDumpMapSimpleSlice(t *testing.T) {
-	
 
 	type stmap struct {
 		I int
@@ -267,7 +288,7 @@ func TestSaveDumpMapSimpleSlice(t *testing.T) {
 	if !reflect.DeepEqual(s1, s2) {
 		t.Error("TestSaveDumpMapSimpleSlice error")
 	}
-		
+
 }
 
 func TestSaveDumpMapStructSlice(t *testing.T) {
@@ -436,6 +457,102 @@ func TestMapArraySlice(t *testing.T) {
 	s1.M[1]["o2"] = 133
 
 	container := parse(s1)
+	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
+
+	container.unmarshal(buf, &s2)
+
+	fmt.Println("s1:", s1, ", s2:", s2)
+
+	//s2.i = 13
+
+	if !reflect.DeepEqual(s1, s2) {
+		t.Error("TestMap failed")
+	}
+}
+
+func TestMapInMapEmpty(t *testing.T) {
+	type si struct {
+		S string
+		M map[string]string
+	}
+
+	type so struct {
+		I int
+		M map[string]si
+	}
+
+	var si1 si
+	si1.S = "hello"
+	//si1.M = append(si1.M, make(map[string]string))
+	si1.M = make(map[string]string)
+	//si1.M[0]["h1"] = "v1"
+
+	//si1.M = append(si1.M, make(map[string]string))
+
+	//si1.M[1]["h2"] = "v2"
+	//si1.M[1]["h3"] = "v3"
+
+	var s1, s2 so
+	container := parse(s1)
+
+	s1.I = 123
+	//s1.Si = si1
+	//s1.S = "sfe"
+
+	s1.M = make(map[string]si)
+	s1.M["o1"] = si1
+
+	//s1.M[1] = make(map[string]int)
+	//s1.M[1]["o2"] = 133
+
+	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
+
+	container.unmarshal(buf, &s2)
+
+	fmt.Println("s1:", s1, ", s2:", s2)
+
+	//s2.i = 13
+
+	if !reflect.DeepEqual(s1, s2) {
+		t.Error("TestMap failed")
+	}
+}
+
+func TestMapInMap(t *testing.T) {
+	type si struct {
+		S string
+		M map[string]string
+	}
+
+	type so struct {
+		I int
+		M map[string]si
+	}
+
+	var si1 si
+	si1.S = "hello"
+	//si1.M = append(si1.M, make(map[string]string))
+	si1.M = make(map[string]string)
+	si1.M["h1"] = "v1"
+
+	//si1.M = append(si1.M, make(map[string]string))
+
+	//si1.M[1]["h2"] = "v2"
+	//si1.M[1]["h3"] = "v3"
+
+	var s1, s2 so
+	container := parse(s1)
+
+	s1.I = 123
+	//s1.Si = si1
+	//s1.S = "sfe"
+
+	s1.M = make(map[string]si)
+	s1.M["o1"] = si1
+
+	//s1.M[1] = make(map[string]int)
+	//s1.M[1]["o2"] = 133
+
 	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
 
 	container.unmarshal(buf, &s2)
