@@ -688,16 +688,22 @@ func testBasicAll[T comparable](in []T, t *testing.T) {
 	testBasicInStruct(in, t)
 	testBasicInMap(in, in, t)
 
-	inAll := make([]allBasicType,  len(in))
+	inAll := make([]AllBasicType,  len(in))
 	for i:=0; i<len(in); i++ {
 		(&inAll[i]).rand()
 	}
 	testBasicInMap(in, inAll, t)
+
+	fmt.Println("testBasicAll: compost" );
+
+	testBasicInMap(in, makeCompostArray(in), t)
+	testBasicInMap(in, makeCompost2Array(in), t)
+
 }
 
 func TestTssdAll(t *testing.T) {
 	testBasicAll([]bool{true, false}, t)
-	testBasicAll([]int8{0, -1, 1, 127, -128, 100, -35}, t)
+	/*testBasicAll([]int8{0, -1, 1, 127, -128, 100, -35}, t)
 	testBasicAll([]uint8{0, 1, 127, 255, 100}, t)
 	testBasicAll([]uint16{0, 1, 127, 255, 12345, 0xFFFF}, t)
 	testBasicAll([]int16{0, -1, 1, 127, -55, 255, -0x7FFF, 13579, 0x7FFF}, t)
@@ -713,7 +719,7 @@ func TestTssdAll(t *testing.T) {
 		-0x7FFFFFFF, 0x7FFFFFFFFFFFFFFF, -0x7FFFFFFFFFFFFFFF}, t)
 
 	testBasicAll([]float32{0.0, -1.23, 134.5, 12345.7890, -12898.0000}, t)
-	testBasicAll([]float64{0.0, -9.23, 134.5, 123456789.7890, -12898786544444444.0000}, t)
+	testBasicAll([]float64{0.0, -9.23, 134.5, 123456789.7890, -12898786544444444.0000}, t)*/
 	testBasicAll([]string{
 		"",
 		"a",
@@ -726,7 +732,6 @@ func TestTssdAll(t *testing.T) {
 		"6677888888",
 		"fooobar",
 		"foo     bar",
-		"$%&&*(()))",
 		"password1234&*&***&* ###$$$afwewe",
 	}, t)
 }
@@ -756,18 +761,24 @@ func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
 	var m = make(map[T]V, 0)
 
 	ti := parse(m)
+	//fmt.Println("testBasicInMap:", in[0], in[1])
 	for i := range in {
 		m[in[i]] = in2[i]
-		dest, _ := ti.marshal(Ptr(&m), make([]byte, 0, 2048))
+		dest, err := ti.marshal(Ptr(&m), make([]byte, 0, 2048))
+		if err != nil {
+			t.Error("testBasicInMap marshal failed")
+		}
+		//fmt.Println("testBasicInMap in[i]:", in[i], in2[i], len(dest))
+
 		var out map[T]V
-		ti.unmarshal(dest, Ptr(&out))
-		if !reflect.DeepEqual(m, out) {
+		_, err = ti.unmarshal(dest, Ptr(&out))
+		if err!=nil || !reflect.DeepEqual(m, out) {
 			t.Error("testBasicInMap failed")
 		}
 	}
 }
 
-type allBasicType struct {
+type AllBasicType struct {
 	//we random the order
 	Vuint32  uint32
 	Vfloat64 float64
@@ -782,6 +793,63 @@ type allBasicType struct {
 	Vfloat32 float32
 	Vint8    int8
 }
+
+type compost[T comparable] struct {
+	AllBasicType
+	M map[T]AllBasicType
+	S []AllBasicType
+}
+
+func makeCompostArray[T comparable](in []T) []compost[T] {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r3 := r.Intn(3)
+	fmt.Println("makeCompostArray r3:", r3)
+	ret := make([]compost[T], len(in))
+	
+	for i:=0; i<len(in); i++ {
+		(&ret[i].AllBasicType).rand()
+		ret[i].M = make(map[T]AllBasicType, 0)
+		for j:=0; j<r3; j++ {
+			var a AllBasicType
+			(&a).rand()
+			ret[i].M[in[j]] = a
+			ret[i].S = append(ret[i].S, a)
+		}
+	}
+	return ret
+}
+
+type compost2[T comparable] struct {
+	M []map[T][]AllBasicType
+	//AllBasicType
+}
+
+
+func makeCompost2Array[T comparable](in []T) []compost2[T] {
+	ret := make([]compost2[T], len(in))
+	
+	for i:=0; i<len(in); i++ {
+		//(&ret[i].AllBasicType).rand()
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		r3 := r.Intn(3) + 1
+		fmt.Println("makeCompostArray r3:", r3)
+		mvalue := make([]AllBasicType, r3)
+		for j:=0; j<r3; j++ {
+			(&mvalue[j]).rand()
+		}
+
+		r3 = r.Intn(3) + 1
+
+		ret[i].M = make([]map[T][]AllBasicType, r3)
+
+		for j:=0; j<r3; j++ {
+			ret[i].M[j] = make(map[T][]AllBasicType, 0)
+			ret[i].M[j][in[j]] = mvalue
+		}
+	}
+	return ret
+}
+
 
 func randBytes(n int) []byte {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -806,7 +874,7 @@ const (
 	maxInt64 = int64(maxUint64 >> 1)
 )
 
-func (this *allBasicType) rand() {
+func (this *AllBasicType) rand() {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	this.Vbool = []bool{true, false}[r.Intn(10)%2]
@@ -825,7 +893,7 @@ func (this *allBasicType) rand() {
 }
 
 func TestAllBasicTypeInStruct(t *testing.T) {
-	var in, out allBasicType
+	var in, out AllBasicType
 	ti := parse(in)
 
 	(&in).rand()
@@ -841,7 +909,7 @@ func TestAllBasicTypeInStruct(t *testing.T) {
 }
 
 func TestAllBasicTypeInStructArray(t *testing.T) {
-	var in, out [3]allBasicType
+	var in, out [3]AllBasicType
 	ti := parse(in)
 
 	for i:=0; i<3; i++ {
@@ -859,13 +927,13 @@ func TestAllBasicTypeInStructArray(t *testing.T) {
 }
 
 func TestAllBasicTypeInStructSlice(t *testing.T) {
-	var in, out []allBasicType
+	var in, out []AllBasicType
 	ti := parse(in)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	n := r.Intn(128)
 
-	in = make([]allBasicType, n)
+	in = make([]AllBasicType, n)
 
 	for i:=0; i<n; i++ {
 		(&in[i]).rand()

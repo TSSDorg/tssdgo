@@ -331,7 +331,7 @@ func (ti *typeInfo) mapMapValueDump(src []byte) (v reflect.Value, remain []byte,
 			return v, src, ErrorInSufficientData
 		}
 		size = int(dumpSize(src[1:]))
-		fmt.Println("dictDump dump size:", size)
+
 		if len(src) < 3+size {
 			//TODO, add field name info
 			return v, src, ErrorInSufficientData
@@ -381,7 +381,7 @@ func (ti *typeInfo) mapMapValueDump(src []byte) (v reflect.Value, remain []byte,
 	default:
 		return v, src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
 	}
-	fmt.Println("dictDump:", len(src), size)
+
 	return v, src[3+size:], nil
 }
 
