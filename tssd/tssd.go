@@ -38,7 +38,7 @@ const (
 	Tdictk          //key of a map node
 	Tdictv          //value of a map node
 	Traw            //raw binary data
-	Tschema  = 83   //'S' schema meta data string
+	Tschema  = 77   //'M' schema meta data string
 	Theader  = 84   //'T' tssd header
 	Tversion = 86   //'V' tssd format version
 	Tuser    = 0xEF //user define data
