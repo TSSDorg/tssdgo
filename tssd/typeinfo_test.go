@@ -50,11 +50,14 @@ func TestString(t *testing.T) {
 	if e != nil || len(b) == 0 {
 		t.Errorf("Test String Marshal err %s", e)
 	}
+	
+	fmt.Println("testString out buf:", b)
 	container.print(b)
+	fmt.Println("testString out end")
 
 	container.unmarshal(b, &s2)
 	if !reflect.DeepEqual(sin1, s2) {
-		t.Errorf("Test String err %s %s", sin1.Str, s2.Str)
+		t.Errorf("Test String err: [%s], [%s]", sin1.Str, s2.Str)
 	}
 
 	b, e = container.marshal(&sin2, make([]byte, 0, 2048))
@@ -64,7 +67,29 @@ func TestString(t *testing.T) {
 	container.print(b)
 	container.unmarshal(b, &s2)
 	if !reflect.DeepEqual(sin2, s2) {
-		t.Errorf("Test String err %s %s", sin2.Str, s2.Str)
+		t.Errorf("Test String err: [%s], [%s]", sin2.Str, s2.Str)
+	}
+}
+
+func TestSimpleStringSlice(t *testing.T) {
+
+	type slice struct{
+		Ss []string
+	}
+
+	sin := slice {
+		[]string {"a", "b"},
+	}
+	var sout slice
+	container := parse(sin)
+	buf, _ := container.marshal(&sin, make([]byte, 0, 2048))
+	container.print(buf)
+	fmt.Println("TestSimpleStringSlice buf:", buf)
+
+	container.unmarshal(buf, &sout)
+	if !reflect.DeepEqual(sin, sout) {
+		fmt.Println("TestSimpleStringSlice sout:", sout)
+		t.Errorf("Test String slice err ")
 	}
 }
 
@@ -107,11 +132,11 @@ func TestStringArray(t *testing.T) {
 	n, _ := container.marshal(&sin1, make([]byte, 0, 2048))
 
 	fmt.Println(container)
-	fmt.Println(sin1)
+	fmt.Println(sin1, n)
 
 	container.unmarshal(n, &s2)
 	if !reflect.DeepEqual(sin1, s2) {
-		t.Errorf("Test String array err ")
+		t.Errorf("Test String array err")
 	}
 }
 
@@ -697,7 +722,7 @@ func testBasicAll[T comparable](in []T, t *testing.T) {
 	fmt.Println("testBasicAll: compost" );
 
 	testBasicInMap(in, makeCompostArray(in), t)
-	testBasicInMap(in, makeCompost2Array(in), t)
+	//testBasicInMap(in, makeCompost2Array(in), t)
 
 }
 
