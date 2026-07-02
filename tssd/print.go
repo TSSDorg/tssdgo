@@ -68,6 +68,9 @@ func parseMergeArray(info *typeInfo, ttype int8, buf []byte) string {
 }
 
 func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
+	if len(buf) == 0 {
+		return nil
+	}
 	if info.Type != int8(buf[0]) && -info.Type != int8(buf[0]) {
 		fmt.Println("print parsetype mismatch ", info.Type, buf[0])
 		return buf
@@ -101,75 +104,48 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 	case Tstring:
 		node.Content, buf = dprintf[string](info, "%s(%s): %s", buf)
 	case Ttime:
-		if len(buf) < 3 {
-			fmt.Println("need more data size: ", len(buf))
+		size, remain, err := checkDumpSizet(buf)
+		if err != nil {
 			return buf
 		}
-		size := int(dumpSize(buf[1:]))
-		if len(buf) < 3+size {
-			fmt.Println("need more data time: ", len(buf))
-			return buf
-		}
-		rfc3339Str := string(buf[3 : 3+size])
+
+		rfc3339Str := string(remain[:size])
 		t, err := time.Parse(time.RFC3339Nano, rfc3339Str)
 		if err != nil {
 			fmt.Println("parse time err:", err)
 			return buf
 		}
 		node.Content = fmt.Sprintf("%s(%s): %s", info.name, info.rtype.String(), t.Format(time.RFC3339Nano))
-
-		return buf[3+size:]
-
+		return remain[size:]
 	case Tobject:
-		if len(buf) < 5 {
-			fmt.Println("need more data size: ", len(buf))
+		sizet, fields, remain, err := checkDumpSize(buf)
+		if err != nil {
 			return buf
 		}
-		size := int(dumpSize(buf[1:]))
-		if len(buf) < 3+size {
-			fmt.Println("need more data size: ", len(buf), size)
-			return buf
-		}
-		fields := int(dumpSize(buf[3:]))
 
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: fields:%d)", info.name, info.rtype.String(), size, fields)
-		remain := buf[5:]
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: fields:%d)", info.name, info.rtype.String(), sizet, fields)
 		for i := range fields {
 			remain = info.info[i].parse(node, remain)
 		}
 		return remain
 	case Tarray:
-		if len(buf) < 5 {
-			fmt.Println("need more data: ", len(buf))
+		sizet, arrayN, remain, err := checkDumpSize(buf)
+		if err != nil {
 			return buf
 		}
-		size := int(dumpSize(buf[1:]))
-		if len(buf) < 3+size {
-			fmt.Println("need more data size: ", len(buf), size)
-			return buf
-		}
-		arrayN := int(dumpSize(buf[3:]))
 
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), size, arrayN)
-		remain := buf[5:]
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), sizet, arrayN)
 		for i := 0; i < arrayN; i++ {
 			remain = info.info[0].parse(node, remain)
 		}
 		return remain
 	case Tarraym: //[Tarraym][Ttype][sizet][sizea][data]
-		if len(buf) < 6 {
-			fmt.Println("need more data: ", len(buf))
+		sizet, arrayN, remain, err := checkDumpSize(buf[TSSD_TYPE_LENGTH:])
+		if err != nil {
 			return buf
 		}
-		size := int(dumpSize(buf[2:]))
-		if len(buf) < 4+size {
-			fmt.Println("need more data size: ", len(buf), size)
-			return buf
-		}
-		arrayN := int(dumpSize(buf[4:]))
 
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)%s[", info.name, info.rtype.String(), size, arrayN, info.info[0].rtype.String())
-		remain := buf[6:]
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)%s[", info.name, info.rtype.String(), sizet, arrayN, info.info[0].rtype.String())
 		for i := 0; i < arrayN; i++ {
 			node.Content += parseMergeArray(&info.info[0], int8(buf[1]), remain)
 			remain = remain[info.info[0].size:]
@@ -177,19 +153,12 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 		node.Content += "]"
 		return remain
 	case Tdict:
-		if len(buf) < 3 {
-			fmt.Println("need more data for size: ", len(buf))
-			return buf
-		}
-		size := int(dumpSize(buf[1:]))
-		if len(buf) < 3+size {
-			fmt.Println("need more data for the map: ", len(buf))
+		sizet, mapLen, remain, err := checkDumpSize(buf)
+		if err != nil {
 			return buf
 		}
 
-		mapLen := int(dumpSize(buf[3:]))
-		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), size, mapLen)
-		remain := buf[5:]
+		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), sizet, mapLen)
 		fmt.Println("mapLen:", mapLen, node.Content, remain)
 		for k := 0; k < mapLen; k++ {
 			kvNode := &Node{

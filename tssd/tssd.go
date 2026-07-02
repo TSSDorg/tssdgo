@@ -6,10 +6,13 @@ import (
 )
 
 const (
-	MAGIC          = "SSD"
-	TSSD_VERSION   = 1
-	TSSD_FLAT_KIND = "tssd.Flat"
-	TSSD_TIME_KIND = "time.Time"
+	MAGIC             = "SSD"
+	TSSD_VERSION      = 1
+	TSSD_FLAT_KIND    = "tssd.Flat"
+	TSSD_TIME_KIND    = "time.Time"
+	TSSD_TYPE_LENGTH  = 1
+	TSSD_SIZET_LENGTH = 4
+	TSSD_SIZEA_LENGTH = 2
 )
 
 type Ttype int8
@@ -38,7 +41,7 @@ const (
 	Tdictk          //key of a map node
 	Tdictv          //value of a map node
 	Traw            //raw binary data
-	Tschema  = 83   //'S' schema meta data string
+	Tschema  = 77   //'M' schema meta data string
 	Theader  = 84   //'T' tssd header
 	Tversion = 86   //'V' tssd format version
 	Tuser    = 0xEF //user define data
@@ -53,7 +56,7 @@ var schemaTypeInfo *typeInfo
 
 type Header struct {
 	Magic   [4]byte
-	Version int16
+	Version uint16
 	Schema  Schema
 }
 
@@ -81,7 +84,7 @@ func appendHeader(buf []byte, schema Schema) []byte {
 	buf = append(buf, Theader)
 	buf = append(buf, MAGIC...)
 	buf = append(buf, Tversion)
-	buf = appendSize(buf, TSSD_VERSION)
+	buf = appendSize2(buf, TSSD_VERSION)
 
 	buf = append(buf, byte(Tschema))
 	return schema.Marshal(buf)
@@ -105,7 +108,7 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 		//Schema: &schema,
 	}
 
-	header.Version = dumpSize(buf[5:])
+	header.Version = uint16(dumpSize2(buf[5:]))
 
 	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
 		return nil, buf, err

@@ -1,8 +1,10 @@
 package tssd_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
 
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
@@ -73,11 +75,16 @@ func (this *worker_V1) Progeny() string {
 	return "worker_V2"
 }
 
+const (
+	SCHEMA_TYPE = "schema-type as you want"
+	SCHEMA_CONTENT = "schema-content: any string is ok"
+)
+
 func (this *worker_V1) Schema(factory tssd.Factory) tssd.Schema {
 	return tssd.Schema {
 		this.Hash(this.Types(factory)),
-		"schema-type",  
-		"blablabla...",
+		SCHEMA_TYPE,  
+		SCHEMA_CONTENT,
 	}
 }
 
@@ -85,6 +92,9 @@ func (this *worker_V1) OnHeader(header tssd.Header) (err error) {
 	 //and you can get the extend info in header.Schema which from peer
 	 //maybe it's "blabla.."
 	 fmt.Println("schema type: {}, content: {}", header.Schema.Type, header.Schema.Content)
+	 if header.Schema.Type != SCHEMA_TYPE || header.Schema.Content != SCHEMA_CONTENT {
+		return errors.New("TSSD schema extent info err")
+	 }
 	 return nil
 }
 
