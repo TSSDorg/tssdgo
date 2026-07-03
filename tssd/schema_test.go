@@ -9,6 +9,12 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
+var workerFactory *tssd.Factory
+
+func init() {
+	workerFactory = tssd.New(&worker{})
+}
+
 //you can alias to simplify for users, 
 //but update it after every update the struct
 type worker = worker_V2
@@ -40,9 +46,9 @@ func (this *worker_V2) Progeny() string {
 	return "worker_V3"
 }
 
-func (this *worker_V2) Schema(factory tssd.Factory) tssd.Schema {
+func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema {
-		this.Hash(this.Types(factory)),
+		this.Hash(this.Types()),
 		"json",  
 		"jsonstring",
 	}
@@ -80,9 +86,9 @@ const (
 	SCHEMA_CONTENT = "schema-content: any string is ok"
 )
 
-func (this *worker_V1) Schema(factory tssd.Factory) tssd.Schema {
+func (this *worker_V1) Schema() tssd.Schema {
 	return tssd.Schema {
-		this.Hash(this.Types(factory)),
+		this.Hash(this.Types()),
 		SCHEMA_TYPE,  
 		SCHEMA_CONTENT,
 	}
@@ -110,7 +116,7 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&worker{})
+	factory := workerFactory //tssd.New(&worker{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
@@ -155,11 +161,12 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 		Address: "White Hourse",
 		Age: age,
 	}
+	st.SetFactory(workerFactory)
 
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&worker{})
+	factory := workerFactory //tssd.New(&worker{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
@@ -167,6 +174,7 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 	factory.Register(&worker_V2{})
 
 	var s1 worker_V1
+	(&s1).SetFactory(workerFactory)
 	//buf input by v2, you can't downgrade to v1
 	_, err := factory.UnmarshalTo(buf, &s1);
 	if  err == nil {

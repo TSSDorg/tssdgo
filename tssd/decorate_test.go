@@ -7,6 +7,12 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
+var studentFactory *tssd.Factory
+
+func init() {
+	studentFactory = tssd.New(&student{})
+}
+
 //you can alias to simplify for users, 
 //but update it after every update the struct
 type student = student_V3
@@ -120,7 +126,7 @@ func TestUnmarshalDecorate(t *testing.T) {
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&student{})
+	factory := studentFactory //tssd.New(&student{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object

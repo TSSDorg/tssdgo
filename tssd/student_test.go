@@ -11,6 +11,12 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
+var stuFactory *tssd.Factory
+
+func init() {
+	stuFactory = tssd.New(&Student{})
+}
+
 type Equaler interface {
 	Equal(Equaler) bool
 }
@@ -156,9 +162,10 @@ func TestStudent(t *testing.T) {
 	}
 
 	//container := tssd.Parse(v)
-	container := tssd.New(&v)
+	container := stuFactory //tssd.New(&v)
+	(&v).SetFactory(stuFactory)
 
-	n, _ := container.Marshal(&v)
+	n, _ := stuFactory.Marshal(&v)
 
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th failed")
@@ -167,6 +174,7 @@ func TestStudent(t *testing.T) {
 	container.Print(v.Version(), n)
 
 	var v2 Student
+	(&v2).SetFactory(stuFactory)
 	container.UnmarshalTo(n, &v2)
 	fmt.Println("-----v:", v)
 	fmt.Println("-----v2:", v2)
@@ -174,12 +182,14 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct student failed")
 	}
 
+	
 	n, _ = container.Marshal(&v2)
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
 	var v3 Student
+	(&v3).SetFactory(stuFactory)
 	container.UnmarshalTo(n, &v3)
 	if !v3.Equal(&v) {
 		t.Error("TestStruct student failed")
