@@ -7,12 +7,12 @@ import (
 	"reflect"
 )
 
-var group = map[string]*Factory{}
+var group = map[string]*factory{}
 
 func Register(flat Flatable) {
 	g := flat.Group()
 	if _, ok := group[g]; !ok {
-		factory := &Factory{
+		factory := &factory{
 			versions: make(map[string]*buildInfo, 0),
 			schemas:  make(map[string]*buildInfo, 0),
 		}
@@ -24,7 +24,7 @@ func Register(flat Flatable) {
 	group[g].Register(flat)
 }
 
-type BuildFunc = func() Flatable
+//type BuildFunc = func() Flatable
 
 type buildInfo struct {
 	version string //current version
@@ -35,7 +35,7 @@ type buildInfo struct {
 	builder Flatable //keep it as builder
 }
 
-type Factory struct {
+type factory struct {
 	current  string
 	versions map[string]*buildInfo //local we seek by names or version
 	schemas  map[string]*buildInfo //and remote we seek by schema
@@ -61,9 +61,9 @@ type Flatable interface {
 	//return none-nil error will block factory to Unmarsh
 	OnHeader(header Header) (err error)
 
-	//return (group, ver) of the object, such as (Student, V1)
+	//return ver of the object, such as V1
 	Version() string
-
+	//return group of this class, suggest base class name, EG: Student 
 	Group() string
 
 	//Progeny or Successor of current version
@@ -131,8 +131,8 @@ func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return flat
 }
 
-func New(flat Flatable) *Factory {
-	factory := &Factory{
+func New(flat Flatable) *factory {
+	factory := &factory{
 		versions: make(map[string]*buildInfo, 0),
 		schemas:  make(map[string]*buildInfo, 0),
 	}
@@ -141,7 +141,7 @@ func New(flat Flatable) *Factory {
 	return factory
 }
 
-func (factory *Factory) Register(flat Flatable) {
+func (factory *factory) Register(flat Flatable) {
 	if factory.current == flat.Version() {
 		return
 	}
@@ -164,7 +164,7 @@ func (factory *Factory) Register(flat Flatable) {
 	factory.schemas[hash] = bi
 }
 
-func (factory *Factory) Validate(header Header) error {
+func (factory *factory) Validate(header Header) error {
 	if header.Version != TSSD_VERSION {
 		return ErrorInvalidTSSDVersion
 	}
@@ -182,7 +182,7 @@ func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
 	return group[g].MarshalTo(flat, to)
 }
 
-func (factory *Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
+func (factory *factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
 		return nil, ErrorTSSDDataSchemaReject
@@ -196,7 +196,7 @@ func Marshal(from Flatable) ([]byte, error) {
 	return MarshalTo(from, make([]byte, 0, 4096))
 }
 
-func (factory *Factory) Marshal(flat Flatable) ([]byte, error) {
+func (factory *factory) Marshal(flat Flatable) ([]byte, error) {
 
 	//TODO: maybe we should mashal current version obj only ?
 	if _, ok := factory.versions[flat.Version()]; ok {
@@ -220,7 +220,7 @@ func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
 }
 
 // UnmarshalTo direct unmarshal to your object
-func (factory *Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
+func (factory *factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return src, err
@@ -262,7 +262,7 @@ func (factory *Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 }
 
 // chain upgate it to the latest
-func (factory *Factory) decorate(flat, to Flatable) (Flatable, error) {
+func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 	for v := flat.Progeny(); len(v) > 0; {
 		if v == to.Version() {
 			return to.Decorate(flat), nil
@@ -280,7 +280,7 @@ func (factory *Factory) decorate(flat, to Flatable) (Flatable, error) {
 }
 
 // Unmarshal we new a current version object for user and return the remain bytes after consum
-func (factory *Factory) Unmarshal(src []byte) (Flatable, []byte, error) {
+func (factory *factory) Unmarshal(src []byte) (Flatable, []byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return nil, src, err

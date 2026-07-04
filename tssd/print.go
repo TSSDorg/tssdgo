@@ -190,7 +190,7 @@ func (info *typeInfo) print(data []byte) {
 }
 
 // print your tssd []byte
-func (factory Factory) Print(version string, data []byte) {
+func (factory factory) Print(version string, data []byte) {
 	//factory.versions[version].info.print(data)
 
 	info := factory.versions[version].info
