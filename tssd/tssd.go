@@ -51,6 +51,7 @@ var ErrorInvalidTSSDVersion = errors.New("TSSD version invalid or too new to pro
 var ErrorInvalidTSSDData = errors.New("TSSD data invalid format error or damaged")
 var ErrorInSufficientData = errors.New("Need more data to process")
 var ErrorTSSDDataSchemaReject = errors.New("TSSD data schema not match")
+var ErrorTSSDDataUnregister = errors.New("TSSD data schema not found or not register")
 
 var schemaTypeInfo *typeInfo
 

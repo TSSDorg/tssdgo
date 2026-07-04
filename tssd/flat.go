@@ -7,6 +7,23 @@ import (
 	"reflect"
 )
 
+var group = map[string]*Factory{}
+
+func Register(flat Flatable) {
+	g := flat.Group()
+	if _, ok := group[g]; !ok {
+		factory := &Factory{
+			versions: make(map[string]*buildInfo, 0),
+			schemas:  make(map[string]*buildInfo, 0),
+		}
+		group[g] = factory
+		factory.Register(flat)
+		factory.current = flat.Version()
+		return
+	}
+	group[g].Register(flat)
+}
+
 type BuildFunc = func() Flatable
 
 type buildInfo struct {
@@ -44,8 +61,10 @@ type Flatable interface {
 	//return none-nil error will block factory to Unmarsh
 	OnHeader(header Header) (err error)
 
-	//the current version or class name of the object
+	//return (group, ver) of the object, such as (Student, V1)
 	Version() string
+
+	Group() string
 
 	//Progeny or Successor of current version
 	//which version it can upgrade to after Decorate
@@ -54,11 +73,6 @@ type Flatable interface {
 
 	//After Unmarshal, Decorate the object to support convert some info or migration/upgrate the object
 	Decorate(Flatable) Flatable
-
-	//Factory should be a static handle in package
-	GetFactory() *Factory
-
-	SetFactory(*Factory) Flatable
 }
 
 type constrainFlatable[T any] interface {
@@ -67,16 +81,17 @@ type constrainFlatable[T any] interface {
 }
 
 type Flat[T any, PT constrainFlatable[T]] struct {
-	*Factory
 }
 
 func (this *Flat[T, PT]) Build() Flatable {
-	pt := PT(new(T))
-	pt.SetFactory(this.Factory)
-	return pt
+	return PT(new(T))
 }
 
 func (*Flat[T, PT]) Version() string {
+	return TSSD_FLAT_KIND
+}
+
+func (*Flat[T, PT]) Group() string {
 	return TSSD_FLAT_KIND
 }
 
@@ -85,8 +100,9 @@ func (*Flat[T, PT]) Progeny() string {
 }
 
 func (this *Flat[T, PT]) Types() []byte {
-	version := this.Build().Version()
-	return this.GetFactory().versions[version].info.types()
+	obj := this.Build()
+	g, version := obj.Group(), obj.Version()
+	return group[g].versions[version].info.types()
 }
 
 func (this *Flat[T, PT]) Hash(types []byte) string {
@@ -113,15 +129,6 @@ func (this *Flat[T, PT]) OnHeader(header Header) error {
 
 func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return flat
-}
-
-func (this *Flat[T, PT]) GetFactory() *Factory {
-	return this.Factory
-}
-
-func (this *Flat[T, PT]) SetFactory(f *Factory) Flatable {
-	this.Factory = f
-	return this
 }
 
 func New(flat Flatable) *Factory {
@@ -151,7 +158,6 @@ func (factory *Factory) Register(flat Flatable) {
 	}
 
 	factory.versions[flat.Version()] = bi
-	flat.SetFactory(factory)
 	bi.schema = flat.Schema()
 	hash := bi.schema.Hash
 	bi.hash = hash
@@ -168,6 +174,14 @@ func (factory *Factory) Validate(header Header) error {
 	return nil
 }
 
+func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
+	g := flat.Group()
+	if _, ok := group[g]; !ok {
+		return nil, ErrorTSSDDataUnregister
+	}
+	return group[g].MarshalTo(flat, to)
+}
+
 func (factory *Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
@@ -176,6 +190,10 @@ func (factory *Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 
 	dest = appendHeader(dest, flat.Schema())
 	return bi.info.marshal(flat, dest)
+}
+
+func Marshal(from Flatable) ([]byte, error) {
+	return MarshalTo(from, make([]byte, 0, 4096))
 }
 
 func (factory *Factory) Marshal(flat Flatable) ([]byte, error) {
@@ -187,6 +205,18 @@ func (factory *Factory) Marshal(flat Flatable) ([]byte, error) {
 	}
 
 	return nil, ErrorTSSDDataSchemaReject
+}
+
+func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
+
+	g := to.Group()
+
+	fmt.Println("flat.Unmarshal group:", g, ", flat g", to.Group())
+	if _, ok := group[g]; !ok {
+		return nil, ErrorTSSDDataUnregister
+	}
+
+	return group[g].UnmarshalTo(from, to)
 }
 
 // UnmarshalTo direct unmarshal to your object

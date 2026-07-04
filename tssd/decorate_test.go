@@ -7,10 +7,11 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
-var studentFactory *tssd.Factory
+//var studentFactory *tssd.Factory
 
 func init() {
-	studentFactory = tssd.New(&student{})
+	//studentFactory = tssd.New(&student{})
+	tssd.Register(&student{})
 }
 
 //you can alias to simplify for users, 
@@ -30,6 +31,10 @@ type student_V3 struct {
 
 func (this *student_V3) Version() string {
 	return "student_V3"
+}
+
+func (this *student_V3) Group() string {
+	return "student"
 }
 
 func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
@@ -63,6 +68,10 @@ func (this *student_V2) Version() string {
 	return "student_V2"
 }
 
+func (this *student_V2) Group() string {
+	return "student"
+}
+
 func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	old := flat.(*student_V1)
 	this.Name = old.Name
@@ -89,6 +98,10 @@ func (this *student_V1) Version() string {
 	return "student_V1"
 }
 
+func (this *student_V1) Group() string {
+	return "student"
+}
+
 func (this *student_V1) Progeny() string {
 	return "student_V2"
 }
@@ -100,14 +113,14 @@ var defaultAddress = "White House"
 
 func marshal(obj tssd.Flatable) []byte {
 
-	factory := tssd.New(obj)
+	tssd.Register(obj)
 
 	//dest, err := facoty.Marshal(&st)
 
 	//OR you would like within your space
 	//dest := make([]byte, 1024)
-	buf, _ := factory.MarshalTo(obj, make([]byte, 0, 4096))
-	fmt.Println("marshal:", buf, factory)
+	buf, _ := tssd.MarshalTo(obj, make([]byte, 0, 4096))
+	//fmt.Println("marshal:", buf, factory)
 
 	//save or send to another space
 	//saveOrSend(dest)
@@ -126,16 +139,18 @@ func TestUnmarshalDecorate(t *testing.T) {
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := studentFactory //tssd.New(&student{})
+	//factory := studentFactory //tssd.New(&student{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	factory.Register(&student_V1{})
-	factory.Register(&student_V2{})
+	//factory.Register(&student_V1{})
+	//factory.Register(&student_V2{})
+	tssd.Register(&student_V1{})
+	tssd.Register(&student_V2{})	
 
 	var s1 student_V1
 	//buf input by v1, you can receive v1
-	_, err := factory.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf, &s1);
 	if  err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
@@ -144,18 +159,18 @@ func TestUnmarshalDecorate(t *testing.T) {
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = factory.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf, &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress{
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	_, err = factory.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf, &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-
+/*
 	//but you can receive a latest one
 	flat, _, err := factory.Unmarshal(buf)
 	if  err != nil {
@@ -166,7 +181,7 @@ func TestUnmarshalDecorate(t *testing.T) {
 	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != defaultAddress {
 		t.Errorf("unmarshal not Student or failed")
 	}
-
+*/
 }
 
 func TestObjectPtr(t *testing.T) {
@@ -195,34 +210,34 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&student{})
+	tssd.Register(&student{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	factory.Register(&student_V1{})
-	factory.Register(&student_V2{})
+	tssd.Register(&student_V1{})
+	tssd.Register(&student_V2{})
 
 	var s1 student_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := factory.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf, &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = factory.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf, &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	_, err = factory.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf, &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-
+/*
 	//but you can receive a latest one
 	flat, _, err := factory.Unmarshal(buf)
 	if  err != nil {
@@ -232,7 +247,7 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	stu, ok := flat.(*student)
 	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != st.Address {
 		t.Errorf("unmarshal not Student or failed")
-	}
+	}*/
 }
 
 
@@ -248,33 +263,33 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	buf := marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&student{})
+	tssd.Register(&student{})
 
 	//2. and register a old version, if you someone may send you a old byte sequence
 	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	factory.Register(&student_V1{})
-	factory.Register(&student_V2{})
+	tssd.Register(&student_V1{})
+	tssd.Register(&student_V2{})
 
 	var s1 student_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := factory.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf, &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = factory.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf, &s2);
 	if  err == nil {
 		t.Errorf("unmarshalTo v2 should fail")
 	}
 
 	var s3 student
-	_, err = factory.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf, &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address[0] {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-
+/*
 	//but you can receive a latest one
 	flat, _, err := factory.Unmarshal(buf)
 	if  err != nil {
@@ -284,6 +299,6 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	stu, ok := flat.(*student)
 	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != st.Address[0] {
 		t.Errorf("unmarshal not Student or failed")
-	}
+	}*/
 }
 

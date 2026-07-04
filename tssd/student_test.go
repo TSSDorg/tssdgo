@@ -11,11 +11,6 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
-var stuFactory *tssd.Factory
-
-func init() {
-	stuFactory = tssd.New(&Student{})
-}
 
 type Equaler interface {
 	Equal(Equaler) bool
@@ -162,20 +157,21 @@ func TestStudent(t *testing.T) {
 	}
 
 	//container := tssd.Parse(v)
-	container := stuFactory //tssd.New(&v)
-	(&v).SetFactory(stuFactory)
+	//container := stuFactory //tssd.New(&v)
+	//(&v).SetFactory(stuFactory)
+	tssd.Register(&v)
 
-	n, _ := stuFactory.Marshal(&v)
+	n, _ := tssd.Marshal(&v)
 
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	container.Print(v.Version(), n)
+	//container.Print(v.Version(), n)
 
 	var v2 Student
-	(&v2).SetFactory(stuFactory)
-	container.UnmarshalTo(n, &v2)
+	tssd.Register(&v2)
+	tssd.UnmarshalTo(n, &v2)
 	fmt.Println("-----v:", v)
 	fmt.Println("-----v2:", v2)
 	if !v.Equal(&v2) {
@@ -183,26 +179,27 @@ func TestStudent(t *testing.T) {
 	}
 
 	
-	n, _ = container.Marshal(&v2)
+	n, _ = tssd.Marshal(&v2)
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
 	var v3 Student
-	(&v3).SetFactory(stuFactory)
-	container.UnmarshalTo(n, &v3)
+	tssd.Register(&v3)
+
+	tssd.UnmarshalTo(n, &v3)
 	if !v3.Equal(&v) {
 		t.Error("TestStruct student failed")
 	}
 
 	v2.Address = v2.Address[:0]
 
-	n, _ = container.Marshal(&v2)
+	n, _ = tssd.Marshal(&v2)
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
-	container.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(n, &v3)
 	if !v3.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
@@ -228,15 +225,16 @@ func TestPrintMap(t *testing.T) {
 			"english": {"englis", now.AddDate(0, -2, 0), 93.8},
 		},
 	}
-	container := tssd.New(&s1)
+	//container := tssd.New(&s1)
+	tssd.Register(&s1)
 
-	n, _ := container.MarshalTo(&s1, make([]byte, 0, 2048))
+	n, _ := tssd.MarshalTo(&s1, make([]byte, 0, 2048))
 
 	if len(n) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	container.Print(s1.Version(), n)
+	//container.Print(s1.Version(), n)
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
 
 	out := []byte{112, 104, 105, 115, 105,}
@@ -245,7 +243,7 @@ func TestPrintMap(t *testing.T) {
 
 	var sout student
 	
-	container.UnmarshalTo(n, &sout)
+	tssd.UnmarshalTo(n, &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)
 }
