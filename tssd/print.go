@@ -190,8 +190,11 @@ func (info *typeInfo) print(data []byte) {
 }
 
 // print your tssd []byte
-func (factory Factory) Print(version string, data []byte) {
-	//factory.versions[version].info.print(data)
+func (factory factory) print(version string, data []byte) error {
+
+	if _, ok := factory.versions[version]; !ok {
+		return ErrorTSSDDataUnregister
+	}
 
 	info := factory.versions[version].info
 
@@ -214,4 +217,13 @@ func (factory Factory) Print(version string, data []byte) {
 	info.parse(root, remain)
 
 	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
+	return nil
+}
+
+func Print(flat Flatable, data []byte) error {
+	factory, ok := groups[flat.Group()]
+	if !ok {
+		return ErrorTSSDDataUnregister
+	}
+	return factory.print(flat.Version(), data)
 }

@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
+
+//this file demo how to override Flatable.Schema()
+
+const WORKER_GROUP_NAME = "work_group_name"
 
 //you can alias to simplify for users, 
 //but update it after every update the struct
@@ -22,6 +25,10 @@ type worker_V2 struct {
 	Age int16
 	Address string  //the new version of worker, which we add a new field Address
 	Name string
+}
+
+func (this *worker_V2) Group() string {
+	return WORKER_GROUP_NAME
 }
 
 func (this *worker_V2) Version() string {
@@ -40,9 +47,9 @@ func (this *worker_V2) Progeny() string {
 	return "worker_V3"
 }
 
-func (this *worker_V2) Schema(factory tssd.Factory) tssd.Schema {
+func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema {
-		this.Hash(this.Types(factory)),
+		this.Hash(this.Types()),
 		"json",  
 		"jsonstring",
 	}
@@ -67,6 +74,11 @@ type worker_V1 struct {
 	Age int16
 }
 
+func (this *worker_V1) Group() string {
+	return WORKER_GROUP_NAME
+}
+
+
 func (this *worker_V1) Version() string {
 	return "worker_V1"
 }
@@ -80,9 +92,9 @@ const (
 	SCHEMA_CONTENT = "schema-content: any string is ok"
 )
 
-func (this *worker_V1) Schema(factory tssd.Factory) tssd.Schema {
+func (this *worker_V1) Schema() tssd.Schema {
 	return tssd.Schema {
-		this.Hash(this.Types(factory)),
+		this.Hash(this.Types()),
 		SCHEMA_TYPE,  
 		SCHEMA_CONTENT,
 	}
@@ -99,7 +111,10 @@ func (this *worker_V1) OnHeader(header tssd.Header) (err error) {
 }
 
 //test V1->V2
-func TestUnmarshalDecorateWorker(t *testing.T) {	
+func TestUnmarshalDecorateWorker(t *testing.T) {
+	//make sure to regist current firstly
+	tssd.Register(&worker{})
+	tssd.Register(&worker_V1{})
 
 	st := worker_V1 {
 		Name: name,
@@ -107,19 +122,11 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 		Age: age,
 	}
 
-	buf := marshal(&st)
-
-	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&worker{})
-
-	//2. and register a old version, if you someone may send you a old byte sequence
-	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	factory.Register(&worker_V1{})
-	//factory.Register(&worker_V2{})
+	buf, _ := tssd.Marshal(&st)
 
 	var s1 worker_V1
 	//buf input by v1, you can receive v1
-	_, err := factory.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf, &s1);
 	if  err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
@@ -127,28 +134,21 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	fmt.Println("v1: ", s1)
 
 	var s2 worker_V2
+	tssd.Register(&worker_V2{})
 	//buf input by v1, you can receive v2
-	_, err = factory.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf, &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress{
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
-
-	//but you can receive a latest one
-	flat, _, err := factory.Unmarshal(buf)
-	if  err != nil {
-		t.Errorf("unmarshal v3 fail")
-	}
-
-	stu, ok := flat.(*worker)
-	if !ok || stu.Name != name || stu.Age != age || stu.Address != defaultAddress {
-		t.Errorf("unmarshal not Student or failed")
-	}
-
 }
 
 //V2->V1(fail), V2->V1
-func TestUnmarshalDecorateWorker2(t *testing.T) {	
+func TestUnmarshalDecorateWorker2(t *testing.T) {
+
+	//just register once, so put them in init() is good choice
+	tssd.Register(&worker{})
+	tssd.Register(&worker_V1{})
 
 	st := worker_V2 {
 		Name: name,
@@ -156,40 +156,20 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 		Age: age,
 	}
 
-	buf := marshal(&st)
-
-	//1. user should New a tssd facory with the new version object
-	factory := tssd.New(&worker{})
-
-	//2. and register a old version, if you someone may send you a old byte sequence
-	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	factory.Register(&worker_V1{})
-	factory.Register(&worker_V2{})
+	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
 
 	var s1 worker_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := factory.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf, &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 worker_V2
 	//buf input by v1, you can receive v2
-	_, err = factory.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf, &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
-	}
-
-
-	//but you can receive a latest one
-	flat, _, err := factory.Unmarshal(buf)
-	if  err != nil {
-		t.Errorf("unmarshal v3 fail")
-	}
-
-	stu, ok := flat.(*worker)
-	if !ok || stu.Name != name || stu.Age != age || stu.Address != st.Address {
-		t.Errorf("unmarshal not Student or failed")
 	}
 }

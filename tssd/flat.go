@@ -7,7 +7,37 @@ import (
 	"reflect"
 )
 
-type BuildFunc = func() Flatable
+var groups = map[string]*factory{}
+
+func Register(flat Flatable) {
+	g := flat.Group()
+	if _, ok := groups[g]; !ok {
+		factory := &factory{
+			versions: make(map[string]*buildInfo, 0),
+			schemas:  make(map[string]*buildInfo, 0),
+		}
+		groups[g] = factory
+		factory.Register(flat)
+		factory.current = flat.Version()
+		return
+	}
+	groups[g].Register(flat)
+}
+
+// default the first register one regard as current
+// but we can let user overritten it by the new api
+func RegisterCurrent(flat Flatable) {
+	Register(flat)
+	groups[flat.Group()].current = flat.Version()
+}
+
+// return current version of the register group
+func CurrentVersion(group string) string {
+	if factory, ok := groups[group]; ok {
+		return factory.current
+	}
+	return ""
+}
 
 type buildInfo struct {
 	version string //current version
@@ -18,7 +48,7 @@ type buildInfo struct {
 	builder Flatable //keep it as builder
 }
 
-type Factory struct {
+type factory struct {
 	current  string
 	versions map[string]*buildInfo //local we seek by names or version
 	schemas  map[string]*buildInfo //and remote we seek by schema
@@ -32,20 +62,22 @@ type Flatable interface {
 	Hash([]byte) string
 
 	//return the raw type []byte, you can call but should not override it
-	Types(Factory) []byte
+	//Types() []byte
 
 	//schema write in the TSSD header
 	//you can override it to add more infos such as a big json object string
 	//but you need override OnHeader too
-	Schema(Factory) Schema
+	Schema() Schema
 
 	//when read/received a TSSD header, parse TSSD version and
 	//parse schema and validate you received
 	//return none-nil error will block factory to Unmarsh
 	OnHeader(header Header) (err error)
 
-	//the current version or class name of the object
+	//return ver of the object, such as V1
 	Version() string
+	//return group of this class, suggest base class name, EG: Student
+	Group() string
 
 	//Progeny or Successor of current version
 	//which version it can upgrade to after Decorate
@@ -61,9 +93,10 @@ type constrainFlatable[T any] interface {
 	*T
 }
 
-type Flat[T any, PT constrainFlatable[T]] struct{}
+type Flat[T any, PT constrainFlatable[T]] struct {
+}
 
-func (*Flat[T, PT]) Build() Flatable {
+func (this *Flat[T, PT]) Build() Flatable {
 	return PT(new(T))
 }
 
@@ -71,13 +104,18 @@ func (*Flat[T, PT]) Version() string {
 	return TSSD_FLAT_KIND
 }
 
+func (*Flat[T, PT]) Group() string {
+	return TSSD_FLAT_KIND
+}
+
 func (*Flat[T, PT]) Progeny() string {
 	return ""
 }
 
-func (this *Flat[T, PT]) Types(factory Factory) []byte {
-	version := this.Build().Version()
-	return factory.versions[version].info.types()
+func (this *Flat[T, PT]) Types() []byte {
+	obj := this.Build()
+	g, version := obj.Group(), obj.Version()
+	return groups[g].versions[version].info.types()
 }
 
 func (this *Flat[T, PT]) Hash(types []byte) string {
@@ -89,9 +127,9 @@ func (this *Flat[T, PT]) Hash(types []byte) string {
 	return hashString[:5] + hashString[l-5:l]
 }
 
-func (this *Flat[T, PT]) Schema(factory Factory) Schema {
+func (this *Flat[T, PT]) Schema() Schema {
 	return Schema{
-		this.Hash(this.Types(factory)),
+		this.Hash(this.Types()),
 		"",
 		"",
 	}
@@ -106,17 +144,7 @@ func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return flat
 }
 
-func New(flat Flatable) Factory {
-	factory := Factory{
-		versions: make(map[string]*buildInfo, 0),
-		schemas:  make(map[string]*buildInfo, 0),
-	}
-	factory.Register(flat)
-	factory.current = flat.Version()
-	return factory
-}
-
-func (factory Factory) Register(flat Flatable) {
+func (factory *factory) Register(flat Flatable) {
 	if factory.current == flat.Version() {
 		return
 	}
@@ -133,13 +161,13 @@ func (factory Factory) Register(flat Flatable) {
 	}
 
 	factory.versions[flat.Version()] = bi
-	bi.schema = flat.Schema(factory)
+	bi.schema = flat.Schema()
 	hash := bi.schema.Hash
 	bi.hash = hash
 	factory.schemas[hash] = bi
 }
 
-func (factory Factory) Validate(header Header) error {
+func (factory *factory) Validate(header Header) error {
 	if header.Version != TSSD_VERSION {
 		return ErrorInvalidTSSDVersion
 	}
@@ -149,29 +177,58 @@ func (factory Factory) Validate(header Header) error {
 	return nil
 }
 
-func (factory Factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
+func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
+	g := flat.Group()
+	if _, ok := groups[g]; !ok {
+		return nil, ErrorTSSDDataUnregister
+	}
+	return groups[g].marshalTo(flat, to)
+}
+
+func (factory *factory) marshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
 		return nil, ErrorTSSDDataSchemaReject
 	}
 
-	dest = appendHeader(dest, flat.Schema(factory))
+	dest = appendHeader(dest, flat.Schema())
 	return bi.info.marshal(flat, dest)
 }
 
-func (factory Factory) Marshal(flat Flatable) ([]byte, error) {
+func Marshal(flat Flatable) ([]byte, error) {
+	return MarshalTo(flat, make([]byte, 0, 4096))
+}
+
+func (factory *factory) marshal(flat Flatable) ([]byte, error) {
 
 	//TODO: maybe we should mashal current version obj only ?
 	if _, ok := factory.versions[flat.Version()]; ok {
 		dest := make([]byte, 0, 4096)
-		return factory.MarshalTo(flat, dest)
+		return factory.marshalTo(flat, dest)
 	}
 
 	return nil, ErrorTSSDDataSchemaReject
 }
 
+func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
+	g := to.Group()
+	if _, ok := groups[g]; !ok {
+		return nil, ErrorTSSDDataUnregister
+	}
+
+	return groups[g].unmarshalTo(from, to)
+}
+
+func Unmarshal(from []byte, group string) (to Flatable, remain []byte, err error) {
+	if f, ok := groups[group]; ok {
+		return f.unmarshal(from)
+	}
+
+	return nil, nil, ErrorTSSDDataUnregister
+}
+
 // UnmarshalTo direct unmarshal to your object
-func (factory Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
+func (factory *factory) unmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return src, err
@@ -213,7 +270,7 @@ func (factory Factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 }
 
 // chain upgate it to the latest
-func (factory Factory) decorate(flat, to Flatable) (Flatable, error) {
+func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 	for v := flat.Progeny(); len(v) > 0; {
 		if v == to.Version() {
 			return to.Decorate(flat), nil
@@ -231,7 +288,7 @@ func (factory Factory) decorate(flat, to Flatable) (Flatable, error) {
 }
 
 // Unmarshal we new a current version object for user and return the remain bytes after consum
-func (factory Factory) Unmarshal(src []byte) (Flatable, []byte, error) {
+func (factory *factory) unmarshal(src []byte) (Flatable, []byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return nil, src, err
