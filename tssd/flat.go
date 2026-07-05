@@ -17,11 +17,11 @@ func Register(flat Flatable) {
 			schemas:  make(map[string]*buildInfo, 0),
 		}
 		groups[g] = factory
-		factory.Register(flat)
+		factory.register(flat)
 		factory.current = flat.Version()
 		return
 	}
-	groups[g].Register(flat)
+	groups[g].register(flat)
 }
 
 // default the first register one regard as current
@@ -144,7 +144,7 @@ func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return flat
 }
 
-func (factory *factory) Register(flat Flatable) {
+func (factory *factory) register(flat Flatable) {
 	if factory.current == flat.Version() {
 		return
 	}
@@ -178,11 +178,10 @@ func (factory *factory) Validate(header Header) error {
 }
 
 func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
-	g := flat.Group()
-	if _, ok := groups[g]; !ok {
-		return nil, ErrorTSSDDataUnregister
+	if f, ok := groups[flat.Group()]; ok {
+		return f.marshalTo(flat, to)
 	}
-	return groups[g].marshalTo(flat, to)
+	return nil, ErrorTSSDDataUnregister
 }
 
 func (factory *factory) marshalTo(flat Flatable, dest []byte) ([]byte, error) {
@@ -200,14 +199,7 @@ func Marshal(flat Flatable) ([]byte, error) {
 }
 
 func (factory *factory) marshal(flat Flatable) ([]byte, error) {
-
-	//TODO: maybe we should mashal current version obj only ?
-	if _, ok := factory.versions[flat.Version()]; ok {
-		dest := make([]byte, 0, 4096)
-		return factory.marshalTo(flat, dest)
-	}
-
-	return nil, ErrorTSSDDataSchemaReject
+	return factory.marshalTo(flat, make([]byte, 0, 4096))
 }
 
 func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
