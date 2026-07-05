@@ -44,7 +44,6 @@ func (this *student_V3) Version() string {
 	return "student_V3"
 }
 
-
 func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
 	//you may upgrade from v2
 	if old, ok := flat.(*student_V2); ok {
@@ -289,3 +288,19 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	}
 }
 
+func TestRegister(t *testing.T) {
+	//we have registered in init()
+	current := tssd.CurrentVersion(DECORATE_STUDENT_GROUP)
+	if current != (&student{}).Version() {
+		t.Errorf("register Student failed")
+	}
+
+	tssd.RegisterCurrent(&student_V2{})
+	current = tssd.CurrentVersion(DECORATE_STUDENT_GROUP)
+	if current != (&student_V2{}).Version() {
+		t.Errorf("register Student failed")
+	}
+	if tssd.CurrentVersion("xxx") != "" {
+		t.Errorf("get CurrentVersion failed")
+	} 
+}
