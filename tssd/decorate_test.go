@@ -7,11 +7,16 @@ import (
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
-//var studentFactory *tssd.Factory
+//this file demo for a struct update/migrate between versions
 
+//versions should share the group name, so let it be a const name
+const DECORATE_STUDENT_GROUP = "decorate_test.student"
+
+//you can register many version BEFORE call TSSD API
 func init() {
-	//studentFactory = tssd.New(&student{})
 	tssd.Register(&student{})
+	tssd.Register(&student_V2{})
+	tssd.Register(&student_V1{})
 }
 
 //you can alias to simplify for users, 
@@ -23,19 +28,22 @@ type student = student_V3
 //you need implment Progeny() string to specify which version 
 //and rename a new class name
 type student_V3 struct {
-	tssd.Flat[student_V3, *student_V3]
+	tssd.Flat[student_V3, *student_V3]     //tssd.Flat implement some default API in Flatable
 	Address []string  //the new version of student, which we update to slice
 	Age int16
 	Name string
 }
 
+//Flatable.Group is recomment to you should override it
+func (this *student_V3) Group() string {
+	return DECORATE_STUDENT_GROUP
+}
+
+//Flatable.Version is recomment to you should override it
 func (this *student_V3) Version() string {
 	return "student_V3"
 }
 
-func (this *student_V3) Group() string {
-	return "student"
-}
 
 func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
 	//you may upgrade from v2
@@ -50,6 +58,7 @@ func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
 		this.Age = old.Age
 		this.Address = append(this.Address, defaultAddress)
 	}
+	//return it, you may need call it in chain
 	return this
 }
 
@@ -64,14 +73,19 @@ type student_V2 struct {
 	Name string
 }
 
+//Group() return the group name
+//versions should share the group name, just like the last name in your family
+func (this *student_V2) Group() string {
+	return DECORATE_STUDENT_GROUP
+}
+
+//Version() should return the uniq version name in group
+//just like your first name in your family
 func (this *student_V2) Version() string {
 	return "student_V2"
 }
 
-func (this *student_V2) Group() string {
-	return "student"
-}
-
+//Decorate define how convert a V1 student to a V2 student
 func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	old := flat.(*student_V1)
 	this.Name = old.Name
@@ -80,6 +94,7 @@ func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	return this
 }
 
+//Progeny tell TSSD to convert(Decorate) V2 student to  V3 one if needed
 func (this *student_V2) Progeny() string {
 	return "student_V3"
 }
@@ -99,33 +114,16 @@ func (this *student_V1) Version() string {
 }
 
 func (this *student_V1) Group() string {
-	return "student"
+	return DECORATE_STUDENT_GROUP
 }
 
 func (this *student_V1) Progeny() string {
 	return "student_V2"
 }
 
-
 var name = "Donald J. Trump"
 var age int16 = 80
 var defaultAddress = "White House"
-
-func marshal(obj tssd.Flatable) []byte {
-
-	tssd.Register(obj)
-
-	//dest, err := facoty.Marshal(&st)
-
-	//OR you would like within your space
-	//dest := make([]byte, 1024)
-	buf, _ := tssd.MarshalTo(obj, make([]byte, 0, 4096))
-	//fmt.Println("marshal:", buf, factory)
-
-	//save or send to another space
-	//saveOrSend(dest)
-	return buf
-}
 
 //test V1->V2->V3
 func TestUnmarshalDecorate(t *testing.T) {	
@@ -136,17 +134,7 @@ func TestUnmarshalDecorate(t *testing.T) {
 		Age: age,
 	}
 
-	buf := marshal(&st)
-
-	//1. user should New a tssd facory with the new version object
-	//factory := studentFactory //tssd.New(&student{})
-
-	//2. and register a old version, if you someone may send you a old byte sequence
-	//tssd will auto Unmarshal with the old version object and Decorate to return a new object
-	//factory.Register(&student_V1{})
-	//factory.Register(&student_V2{})
-	tssd.Register(&student_V1{})
-	tssd.Register(&student_V2{})	
+	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
 
 	var s1 student_V1
 	//buf input by v1, you can receive v1
@@ -170,18 +158,6 @@ func TestUnmarshalDecorate(t *testing.T) {
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-/*
-	//but you can receive a latest one
-	flat, _, err := factory.Unmarshal(buf)
-	if  err != nil {
-		t.Errorf("unmarshal v3 fail")
-	}
-
-	stu, ok := flat.(*student)
-	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != defaultAddress {
-		t.Errorf("unmarshal not Student or failed")
-	}
-*/
 }
 
 func TestObjectPtr(t *testing.T) {
@@ -207,7 +183,7 @@ func TestUnmarshalDecorate2(t *testing.T) {
 		Age: age,
 	}
 
-	buf := marshal(&st)
+	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
 
 	//1. user should New a tssd facory with the new version object
 	tssd.Register(&student{})
@@ -260,7 +236,7 @@ func TestUnmarshalDecorate3(t *testing.T) {
 		Age: age,
 	}
 
-	buf := marshal(&st)
+	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
 
 	//1. user should New a tssd facory with the new version object
 	tssd.Register(&student{})
