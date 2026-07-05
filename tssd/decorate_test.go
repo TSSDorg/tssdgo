@@ -34,12 +34,12 @@ type student_V3 struct {
 	Name string
 }
 
-//Flatable.Group is recomment to you should override it
+//Flatable.Group is the one  you should override it
 func (this *student_V3) Group() string {
 	return DECORATE_STUDENT_GROUP
 }
 
-//Flatable.Version is recomment to you should override it
+//Flatable.Version is the one you should override it
 func (this *student_V3) Version() string {
 	return "student_V3"
 }
@@ -183,7 +183,6 @@ func TestObjectPtr(t *testing.T) {
 
 	fmt.Println("st Name:", st.Version())
 
-	//tssd.Parse(st)
 }
 
 //V2->V1(fail), V2->V3 ok
