@@ -24,7 +24,20 @@ func Register(flat Flatable) {
 	groups[g].Register(flat)
 }
 
-//type BuildFunc = func() Flatable
+// default the first register one regard as current
+// but we can let user overritten it by the new api
+func RegisterCurrent(flat Flatable) {
+	Register(flat)
+	groups[flat.Group()].current = flat.Version()
+}
+
+// return current version of the register group
+func CurrentVersion(group string) string {
+	if factory, ok := groups[group]; ok {
+		return factory.current
+	}
+	return ""
+}
 
 type buildInfo struct {
 	version string //current version
@@ -63,7 +76,7 @@ type Flatable interface {
 
 	//return ver of the object, such as V1
 	Version() string
-	//return group of this class, suggest base class name, EG: Student 
+	//return group of this class, suggest base class name, EG: Student
 	Group() string
 
 	//Progeny or Successor of current version
@@ -129,16 +142,6 @@ func (this *Flat[T, PT]) OnHeader(header Header) error {
 
 func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return flat
-}
-
-func New(flat Flatable) *factory {
-	factory := &factory{
-		versions: make(map[string]*buildInfo, 0),
-		schemas:  make(map[string]*buildInfo, 0),
-	}
-	factory.Register(flat)
-	factory.current = flat.Version()
-	return factory
 }
 
 func (factory *factory) Register(flat Flatable) {
@@ -214,6 +217,14 @@ func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
 	}
 
 	return groups[g].unmarshalTo(from, to)
+}
+
+func Unmarshal(from []byte, group string) (to Flatable, remain []byte, err error) {
+	if f, ok := groups[group]; ok {
+		return f.unmarshal(from)
+	}
+
+	return nil, nil, ErrorTSSDDataUnregister
 }
 
 // UnmarshalTo direct unmarshal to your object

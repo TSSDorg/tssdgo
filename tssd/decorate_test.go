@@ -158,6 +158,18 @@ func TestUnmarshalDecorate(t *testing.T) {
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
 		t.Errorf("unmarshalTo v3 fail")
 	}
+
+	//but you can receive a latest one
+	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
+	if  err != nil {
+		t.Errorf("unmarshal v3 fail")
+	}
+
+	stu, ok := flat.(*student)
+	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != defaultAddress {
+		t.Errorf("unmarshal not Student or failed")
+	}
+
 }
 
 func TestObjectPtr(t *testing.T) {
@@ -213,9 +225,9 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-/*
-	//but you can receive a latest one
-	flat, _, err := factory.Unmarshal(buf)
+
+	//but you can receive a latest one with a group name
+	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
 	if  err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
@@ -223,7 +235,7 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	stu, ok := flat.(*student)
 	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != st.Address {
 		t.Errorf("unmarshal not Student or failed")
-	}*/
+	}
 }
 
 
@@ -265,9 +277,9 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address[0] {
 		t.Errorf("unmarshalTo v3 fail")
 	}
-/*
+
 	//but you can receive a latest one
-	flat, _, err := factory.Unmarshal(buf)
+	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
 	if  err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
@@ -275,6 +287,6 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	stu, ok := flat.(*student)
 	if !ok || stu.Name != name || stu.Age != age || stu.Address[0] != st.Address[0] {
 		t.Errorf("unmarshal not Student or failed")
-	}*/
+	}
 }
 
