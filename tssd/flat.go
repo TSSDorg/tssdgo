@@ -7,21 +7,21 @@ import (
 	"reflect"
 )
 
-var group = map[string]*factory{}
+var groups = map[string]*factory{}
 
 func Register(flat Flatable) {
 	g := flat.Group()
-	if _, ok := group[g]; !ok {
+	if _, ok := groups[g]; !ok {
 		factory := &factory{
 			versions: make(map[string]*buildInfo, 0),
 			schemas:  make(map[string]*buildInfo, 0),
 		}
-		group[g] = factory
+		groups[g] = factory
 		factory.Register(flat)
 		factory.current = flat.Version()
 		return
 	}
-	group[g].Register(flat)
+	groups[g].Register(flat)
 }
 
 //type BuildFunc = func() Flatable
@@ -49,7 +49,7 @@ type Flatable interface {
 	Hash([]byte) string
 
 	//return the raw type []byte, you can call but should not override it
-	Types() []byte
+	//Types() []byte
 
 	//schema write in the TSSD header
 	//you can override it to add more infos such as a big json object string
@@ -102,7 +102,7 @@ func (*Flat[T, PT]) Progeny() string {
 func (this *Flat[T, PT]) Types() []byte {
 	obj := this.Build()
 	g, version := obj.Group(), obj.Version()
-	return group[g].versions[version].info.types()
+	return groups[g].versions[version].info.types()
 }
 
 func (this *Flat[T, PT]) Hash(types []byte) string {
@@ -176,13 +176,13 @@ func (factory *factory) Validate(header Header) error {
 
 func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
 	g := flat.Group()
-	if _, ok := group[g]; !ok {
+	if _, ok := groups[g]; !ok {
 		return nil, ErrorTSSDDataUnregister
 	}
-	return group[g].MarshalTo(flat, to)
+	return groups[g].marshalTo(flat, to)
 }
 
-func (factory *factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
+func (factory *factory) marshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
 		return nil, ErrorTSSDDataSchemaReject
@@ -192,35 +192,32 @@ func (factory *factory) MarshalTo(flat Flatable, dest []byte) ([]byte, error) {
 	return bi.info.marshal(flat, dest)
 }
 
-func Marshal(from Flatable) ([]byte, error) {
-	return MarshalTo(from, make([]byte, 0, 4096))
+func Marshal(flat Flatable) ([]byte, error) {
+	return MarshalTo(flat, make([]byte, 0, 4096))
 }
 
-func (factory *factory) Marshal(flat Flatable) ([]byte, error) {
+func (factory *factory) marshal(flat Flatable) ([]byte, error) {
 
 	//TODO: maybe we should mashal current version obj only ?
 	if _, ok := factory.versions[flat.Version()]; ok {
 		dest := make([]byte, 0, 4096)
-		return factory.MarshalTo(flat, dest)
+		return factory.marshalTo(flat, dest)
 	}
 
 	return nil, ErrorTSSDDataSchemaReject
 }
 
 func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
-
 	g := to.Group()
-
-	fmt.Println("flat.Unmarshal group:", g, ", flat g", to.Group())
-	if _, ok := group[g]; !ok {
+	if _, ok := groups[g]; !ok {
 		return nil, ErrorTSSDDataUnregister
 	}
 
-	return group[g].UnmarshalTo(from, to)
+	return groups[g].unmarshalTo(from, to)
 }
 
 // UnmarshalTo direct unmarshal to your object
-func (factory *factory) UnmarshalTo(src []byte, dest Flatable) ([]byte, error) {
+func (factory *factory) unmarshalTo(src []byte, dest Flatable) ([]byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return src, err
@@ -280,7 +277,7 @@ func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 }
 
 // Unmarshal we new a current version object for user and return the remain bytes after consum
-func (factory *factory) Unmarshal(src []byte) (Flatable, []byte, error) {
+func (factory *factory) unmarshal(src []byte) (Flatable, []byte, error) {
 	header, remain, err := dumpHeader(src)
 	if err != nil {
 		return nil, src, err
