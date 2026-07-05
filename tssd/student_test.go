@@ -2,14 +2,12 @@ package tssd_test
 
 import (
 	"fmt"
-	//"reflect"
 	"testing"
 	"time"
-	//"unsafe"
-	//"strconv"
-	//"assert"
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
+
+//this file test for a complex object Student
 
 
 type Equaler interface {
@@ -52,8 +50,14 @@ type Student struct {
 	Courses map[string]Course
 }
 
+const STUDENT_GROUP = "Student"
+
 func (this *Student) Version() string {
-	return "Student"
+	return "V1"
+}
+
+func (this *Student) Group() string {
+	return STUDENT_GROUP
 }
 
 func SliceEqual[T comparable](a, b []T) bool {
@@ -138,14 +142,14 @@ func TestStudent(t *testing.T) {
 
 	v := Student {
 		ID: 101, 
-		/*Name: []string{"Tom", "W", "Bush"}, 
+		Name: []string{"Tom", "W", "Bush"}, 
 		Value: 98.5, 
 		Levels: []int{6, 7, 9, 8, 10},
 		Age: 22, 
 		Birth: now.AddDate(-22, 0, 0), 
 		IsMale: true,
 		Address: []string{"5th street 11", "1st road 123"},
-		Mail:  "tom@gmail.com",*/
+		Mail:  "tom@gmail.com",
 		Courses: map[string]Course{
 			"phisic": {"phisic", now.AddDate(0, -5, 0), 80.5},
 			"english": {"english", now.AddDate(0, -2, 0), 93.8},
@@ -156,9 +160,6 @@ func TestStudent(t *testing.T) {
 		},
 	}
 
-	//container := tssd.Parse(v)
-	//container := stuFactory //tssd.New(&v)
-	//(&v).SetFactory(stuFactory)
 	tssd.Register(&v)
 
 	n, _ := tssd.Marshal(&v)
@@ -167,10 +168,9 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	//container.Print(v.Version(), n)
+	tssd.Print(&v, n)
 
 	var v2 Student
-	tssd.Register(&v2)
 	tssd.UnmarshalTo(n, &v2)
 	fmt.Println("-----v:", v)
 	fmt.Println("-----v2:", v2)
@@ -185,7 +185,6 @@ func TestStudent(t *testing.T) {
 	}
 
 	var v3 Student
-	tssd.Register(&v3)
 
 	tssd.UnmarshalTo(n, &v3)
 	if !v3.Equal(&v) {
@@ -225,7 +224,7 @@ func TestPrintMap(t *testing.T) {
 			"english": {"englis", now.AddDate(0, -2, 0), 93.8},
 		},
 	}
-	//container := tssd.New(&s1)
+	
 	tssd.Register(&s1)
 
 	n, _ := tssd.MarshalTo(&s1, make([]byte, 0, 2048))
@@ -234,7 +233,7 @@ func TestPrintMap(t *testing.T) {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	//container.Print(s1.Version(), n)
+	tssd.Print(&s1, n)
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
 
 	out := []byte{112, 104, 105, 115, 105,}
