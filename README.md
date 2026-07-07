@@ -85,7 +85,7 @@ func init() {
 	tssd.Register(&student_V1{})
 }
 
-//test V1->V2->V3
+//simple sample within test
 func TestUnmarshalDecorate(t *testing.T) {	
 	st := student_V1 {
 		Name: name,
