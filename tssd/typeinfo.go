@@ -127,18 +127,22 @@ func (ti *typeInfo) timeSave(src Ptr, dest []byte) ([]byte, error) {
 	p := (*time.Time)(src)
 
 	dest = append(dest, byte(ti.Type))
+	dest = append(dest, byte(Tstring))
 	return appendString(dest, p.Format(time.RFC3339Nano)), nil
 }
 
 func (ti *typeInfo) timeDump(src []byte, dest Ptr) ([]byte, error) {
-	if len(src) < 1 {
+	if len(src) < TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH {
 		//TODO, add field name info
 		return src, ErrorInSufficientData
 	}
 
 	switch int8(src[0]) {
 	case ti.Type:
-		sizet, remain, err := checkDumpSizet(src)
+		if src[TSSD_TYPE_LENGTH] != byte(Tstring) {
+			return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		}
+		sizet, remain, err := checkDumpSizet(src[TSSD_TYPE_LENGTH:])
 		if err != nil {
 			return src, err
 		}
