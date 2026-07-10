@@ -45,7 +45,7 @@ func (factory *factory) register(flat Flatable) {
 }
 
 func (factory *factory) validate(header Header) error {
-	if header.Version != TSSD_VERSION {
+	if header.Version[1] != TSSD_VERSION_MAJOR || header.Version[0] != TSSD_VERSION_MINOR {
 		return ErrorInvalidTSSDVersion
 	}
 	if _, ok := factory.schemas[header.Schema.Hash]; !ok {

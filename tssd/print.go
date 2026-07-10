@@ -104,7 +104,7 @@ func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
 	case Tstring:
 		node.Content, buf = dprintf[string](info, "%s(%s): %s", buf)
 	case Ttime:
-		size, remain, err := checkDumpSizet(buf)
+		size, remain, err := checkDumpSizet(buf[1:])
 		if err != nil {
 			return buf
 		}
@@ -191,7 +191,6 @@ func (info *typeInfo) print(data []byte) {
 
 // print your tssd []byte
 func (factory factory) print(version string, data []byte) error {
-
 	if _, ok := factory.versions[version]; !ok {
 		return ErrorTSSDDataUnregister
 	}
@@ -203,12 +202,12 @@ func (factory factory) print(version string, data []byte) error {
 	}
 
 	header, remain, err := dumpHeader(data)
-	fmt.Println("after header:", remain, err, info)
+	fmt.Println("after dump header:", header, remain, err, info)
 	headerNode := &Node{
 		Content: "header(header)",
 		Children: []*Node{
-			&Node{Content: fmt.Sprintf("Magic([4]byte):{%s}", string(header.Magic[:]))},
-			&Node{Content: fmt.Sprintf("Version(int16):{%d}", header.Version)},
+			&Node{Content: fmt.Sprintf("Magic([5]byte):{%s}", string(header.Magic[:]))},
+			&Node{Content: fmt.Sprintf("Version[major.minor]:%d.%d", header.Version[1], header.Version[0])},
 			&Node{Content: fmt.Sprintf("Schema:{%s %s %s}", header.Schema.Hash, header.Schema.Type, header.Schema.Content)},
 		},
 	}

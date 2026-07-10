@@ -6,13 +6,15 @@ import (
 )
 
 const (
-	MAGIC             = "SSD"
-	TSSD_VERSION      = 1
+	MAGIC             = "TSSDV"
+	TSSD_VERSION_MINOR      = 1
+	TSSD_VERSION_MAJOR      = 0
 	TSSD_FLAT_KIND    = "tssd.Flat"
 	TSSD_TIME_KIND    = "time.Time"
 	TSSD_TYPE_LENGTH  = 1
 	TSSD_SIZET_LENGTH = 4
 	TSSD_SIZEA_LENGTH = 2
+	//TSSD_BUFFER_CAP_MAX  = 3072 
 )
 
 type Ttype int8
@@ -56,8 +58,8 @@ var ErrorTSSDDataUnregister = errors.New("TSSD data schema not found or not regi
 var schemaTypeInfo *typeInfo
 
 type Header struct {
-	Magic   [4]byte
-	Version uint16
+	Magic   [5]byte
+	Version [2]byte
 	Schema  Schema
 }
 
@@ -82,34 +84,31 @@ func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
 
 func appendHeader(buf []byte, schema Schema) []byte {
 
-	buf = append(buf, Theader)
 	buf = append(buf, MAGIC...)
-	buf = append(buf, Tversion)
-	buf = appendSize2(buf, TSSD_VERSION)
-
+	buf = append(buf, []byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR}...)
 	buf = append(buf, byte(Tschema))
 	return schema.Marshal(buf)
 }
 
 func isMagic(buf []byte) bool {
-	return buf[0] == Theader && buf[1] == MAGIC[0] && buf[2] == MAGIC[1] && buf[3] == MAGIC[2]
+	return string(buf[:len(MAGIC)]) == MAGIC
 }
 
-// [TSSD][Tversion][TSSD_VERSION][Tschema][string-size][xxxxxxx]
+// [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet][sizea=3][xxxxxxx]
 func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
-	if len(buf) < 10 {
+	if len(buf) < 15 {
 		return nil, buf, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
-	if !isMagic(buf) || buf[4] != byte(Tversion) || buf[7] != byte(Tschema) {
+	if !isMagic(buf) || buf[7] != byte(Tschema) {
 		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or version: %d schema %d invalid]", ErrorInvalidTSSDData, buf[4], buf[7])
 	}
 
 	header = &Header{
-		Magic: [4]byte{'T', 'S', 'S', 'D'},
-		//Schema: &schema,
+		Magic: [5]byte{'T', 'S', 'S', 'D', 'V'},
 	}
 
-	header.Version = uint16(dumpSize2(buf[5:]))
+	header.Version[0] = buf[5]
+	header.Version[1] = buf[6]
 
 	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
 		return nil, buf, err
