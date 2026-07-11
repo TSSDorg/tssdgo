@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	MAGIC             = "TSSDV"
-	TSSD_VERSION_MINOR      = 1
-	TSSD_VERSION_MAJOR      = 0
-	TSSD_FLAT_KIND    = "tssd.Flat"
-	TSSD_TIME_KIND    = "time.Time"
-	TSSD_TYPE_LENGTH  = 1
-	TSSD_SIZET_LENGTH = 4
-	TSSD_SIZEA_LENGTH = 2
-	//TSSD_BUFFER_CAP_MAX  = 3072 
+	MAGIC              = "TSSDV"
+	TSSD_VERSION_MINOR = 1
+	TSSD_VERSION_MAJOR = 0
+	TSSD_FLAT_KIND     = "tssd.Flat"
+	TSSD_TIME_KIND     = "time.Time"
+	TSSD_TYPE_LENGTH   = 1
+	TSSD_SIZET_LENGTH  = 4
+	TSSD_SIZEA_LENGTH  = 2
+	TSSD_BUFFER_CAP    = 3072
 )
 
 type Ttype int8
@@ -83,10 +83,11 @@ func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
 }
 
 func appendHeader(buf []byte, schema Schema) []byte {
-
 	buf = append(buf, MAGIC...)
 	buf = append(buf, []byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR}...)
 	buf = append(buf, byte(Tschema))
+	//buf.Append([]byte(MAGIC))
+	//buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
 	return schema.Marshal(buf)
 }
 
@@ -115,4 +116,74 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 	}
 
 	return
+}
+
+type Buffer struct {
+	Cap   int
+	Size  int //total size
+	index int
+	pos   int
+	Data  [][]byte
+}
+
+func (buf *Buffer) Append(bs []byte) {
+	if len(buf.Data) == 0 {
+		if buf.Cap == 0 {
+			buf.Cap = TSSD_BUFFER_CAP
+		}
+		buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
+	}
+	for len(bs) > 0 {
+		w := len(buf.Data) - 1
+		if len(buf.Data[w])+len(bs) <= buf.Cap {
+			buf.Data[w] = append(buf.Data[w], bs...)
+			buf.Size += len(bs)
+			return
+		}
+
+		fill := buf.Cap - len(buf.Data[w])
+		buf.Data[w] = append(buf.Data[w], bs[:fill]...)
+		buf.Size += fill
+		buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
+		bs = bs[fill:]
+	}
+}
+
+func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
+	if len(dest) == 0 {
+		return nil, nil
+	}
+	if buf.Size < len(dest) {
+		return nil, ErrorInSufficientData
+	}
+
+	result = dest
+	wanted := len(dest)
+	n := copy(dest[:wanted], buf.Data[buf.index][buf.pos:])
+	buf.Size -= n
+	buf.pos += n
+	if buf.pos >= buf.Cap {
+		buf.pos = 0
+		buf.index++
+	}
+	if n >= wanted {
+		return result, nil
+	}
+
+	dest = dest[n:]
+	for {
+		n = copy(dest, buf.Data[buf.index])
+		buf.Size -= n
+		dest = dest[n:]
+		if len(dest) == 0 {
+			break
+		}
+		buf.index++
+	}
+	buf.pos += n
+	if buf.pos >= buf.Cap {
+		buf.pos = 0
+		buf.index++
+	}
+	return result, nil
 }

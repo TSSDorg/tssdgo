@@ -1120,3 +1120,119 @@ func TestTssdPrint(t *testing.T) {
 		t.Error("unmarsha struct failed")
 	}
 }
+
+func TestBuffer(t *testing.T) {
+	buf := &Buffer{}
+	buf.Append(nil)
+	if buf.Size != 0 || len(buf.Data) != 1 || cap(buf.Data[0]) != TSSD_BUFFER_CAP {
+		t.Error("Buffer Append nil err")
+	}
+
+	buf.Append([]byte(MAGIC))
+
+	if !isMagic(buf.Data[0]) || buf.Size != len(MAGIC) {
+		t.Error("Buffer Append MAGIC err")
+	}
+}
+
+func TestBuffer2(t *testing.T) {
+	buf := &Buffer{
+		Cap: 2,
+	}
+	buf.Append(nil)
+	if buf.Size != 0 || len(buf.Data) != 1 || cap(buf.Data[0]) != buf.Cap {
+		t.Error("Buffer Append nil err")
+	}
+
+	buf.Append([]byte(MAGIC))
+	if buf.Size != len(MAGIC) || len(buf.Data) != 3 || cap(buf.Data[0]) != buf.Cap {
+		t.Error("Buffer Append magic err")
+	}
+
+	if string(buf.Data[0]) != string([]byte(MAGIC)[:buf.Cap]) ||
+		string(buf.Data[1]) != string([]byte(MAGIC)[buf.Cap:buf.Cap*2]) ||
+		string(buf.Data[2]) != string([]byte(MAGIC)[buf.Cap*2:]) {
+		t.Error("Buffer Append magic content err")
+	}
+
+	if d, err := buf.Read(nil); err != nil || len(d) != 0 {
+		t.Error("Buffer read 0 should return ok")
+	}
+
+	dest := make([]byte, 10)
+	if _, err := buf.Read(dest[:0]); err != nil {
+		t.Error("Buffer read empty should return ok")
+	}
+
+	if _, err := buf.Read(dest); err == nil {
+		t.Error("Buffer read oversize should return err")
+	}
+
+	d, err := buf.Read(dest[:1])
+	if err != nil || len(d) != 1 || d[0] != MAGIC[0] {
+		t.Error("Buffer read 1 byte err:", err, d)
+	}
+
+	d, err = buf.Read(dest[:4])
+	if err != nil || len(d) != 4 || string(d) != string(MAGIC[1:]) || buf.Size != 0 || buf.index != 2 || buf.pos != 1 {
+		t.Error("Buffer read 4 bytes err:", err, d, buf)
+	}
+
+	if d, err = buf.Read(dest[:1]); err == nil {
+		t.Error("Buffer read oversize should return err")
+	}
+}
+
+func SliceEqual[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func Buffer3(t *testing.T, first, second int, r1, r2 []byte) {
+	buf := &Buffer{
+		Cap: 3,
+	}
+
+	dest := make([]byte, 11)
+	for i := range dest {
+		dest[i] = byte(100 + i)
+	}
+
+	buf.Append(dest)
+
+	d, err := buf.Read(dest[:first])
+	if err != nil || !SliceEqual(d, r1) {
+		t.Error("Buffer read r1 err:", err, d, r1)
+	}
+
+	d, err = buf.Read(dest[:second])
+	if err != nil || !SliceEqual(d, r2) {
+		t.Error("Buffer read 4 bytes err:", err, d, r2)
+	}
+}
+
+func TestBuffer3(t *testing.T) {
+	Buffer3(t, 1, 1, []byte{100}, []byte{101})
+	Buffer3(t, 1, 2, []byte{100}, []byte{101, 102})
+	Buffer3(t, 1, 3, []byte{100}, []byte{101, 102, 103})
+	Buffer3(t, 1, 4, []byte{100}, []byte{101, 102, 103, 104})
+	Buffer3(t, 1, 5, []byte{100}, []byte{101, 102, 103, 104, 105})
+	Buffer3(t, 1, 6, []byte{100}, []byte{101, 102, 103, 104, 105, 106})
+	Buffer3(t, 1, 7, []byte{100}, []byte{101, 102, 103, 104, 105, 106, 107})
+	Buffer3(t, 2, 1, []byte{100, 101}, []byte{102})
+	Buffer3(t, 2, 2, []byte{100, 101}, []byte{102, 103})
+	Buffer3(t, 2, 3, []byte{100, 101}, []byte{102, 103, 104})
+	Buffer3(t, 2, 4, []byte{100, 101}, []byte{102, 103, 104, 105})
+	Buffer3(t, 2, 5, []byte{100, 101}, []byte{102, 103, 104, 105, 106})
+	Buffer3(t, 2, 6, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107})
+	Buffer3(t, 2, 7, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108})
+	Buffer3(t, 2, 8, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109})
+	Buffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
+}
