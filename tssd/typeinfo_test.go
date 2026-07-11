@@ -1258,13 +1258,19 @@ func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 
 	buf.Append(dest)
 
+	for i := range dest {
+		dest[i] = byte(0)
+	}
 	d, err := buf.Read(dest[:first])
-	if err != nil || !SliceEqual(d, r1) {
+	if err != nil || !SliceEqual(d, r1) || !SliceEqual(dest[:first], r1){
 		t.Error("Buffer read r1 err:", err, d, r1)
 	}
 
+	for i := range dest {
+		dest[i] = byte(0)
+	}
 	d, err = buf.Read(dest[:second])
-	if err != nil || !SliceEqual(d, r2) {
+	if err != nil || !SliceEqual(d, r2) || !SliceEqual(dest[:second], r2){
 		t.Error("Buffer read 4 bytes err:", err, d, r2)
 	}
 }
