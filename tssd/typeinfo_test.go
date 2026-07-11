@@ -1195,7 +1195,58 @@ func SliceEqual[T comparable](a, b []T) bool {
 	return true
 }
 
-func Buffer3(t *testing.T, first, second int, r1, r2 []byte) {
+func SliceSliceEqual[T comparable](a, b [][]T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !SliceEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
+	buf := &Buffer{
+		Cap: 3,
+	}
+
+	dest := make([]byte, 11)
+	for i := range dest {
+		dest[i] = byte(100 + i)
+	}
+
+	buf.Append(dest[:first])
+	if !SliceSliceEqual(buf.Data, r1) {
+		t.Error("Buffer append r1 err:", buf.Data, r1)
+	}
+
+	buf.Append(dest[:second])
+	if !SliceSliceEqual(buf.Data, r2) {
+		t.Error("Buffer append r2 err:", buf.Data, r2)
+	}
+}
+
+func TestAppendBuffer3(t *testing.T) {
+	appendBuffer3(t, 0, 0, [][]byte {[]byte{},},   [][]byte {[]byte{},})
+	appendBuffer3(t, 0, 1, [][]byte {[]byte{},},   [][]byte {[]byte{100},})
+	appendBuffer3(t, 1, 0, [][]byte {[]byte{100},},   [][]byte {[]byte{100},})
+	appendBuffer3(t, 1, 1, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100},})
+	appendBuffer3(t, 1, 2, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},})
+	appendBuffer3(t, 1, 3, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102}})
+	appendBuffer3(t, 1, 4, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102, 103}})
+	appendBuffer3(t, 1, 5, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102, 103, 104}})
+
+	appendBuffer3(t, 2, 1, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100},})
+	appendBuffer3(t, 2, 2, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101}})
+	appendBuffer3(t, 2, 3, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102}})
+	appendBuffer3(t, 2, 4, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102, 103}})
+	appendBuffer3(t, 2, 5, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102, 103}, []byte{104}})
+}
+
+
+func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 	buf := &Buffer{
 		Cap: 3,
 	}
@@ -1218,21 +1269,23 @@ func Buffer3(t *testing.T, first, second int, r1, r2 []byte) {
 	}
 }
 
-func TestBuffer3(t *testing.T) {
-	Buffer3(t, 1, 1, []byte{100}, []byte{101})
-	Buffer3(t, 1, 2, []byte{100}, []byte{101, 102})
-	Buffer3(t, 1, 3, []byte{100}, []byte{101, 102, 103})
-	Buffer3(t, 1, 4, []byte{100}, []byte{101, 102, 103, 104})
-	Buffer3(t, 1, 5, []byte{100}, []byte{101, 102, 103, 104, 105})
-	Buffer3(t, 1, 6, []byte{100}, []byte{101, 102, 103, 104, 105, 106})
-	Buffer3(t, 1, 7, []byte{100}, []byte{101, 102, 103, 104, 105, 106, 107})
-	Buffer3(t, 2, 1, []byte{100, 101}, []byte{102})
-	Buffer3(t, 2, 2, []byte{100, 101}, []byte{102, 103})
-	Buffer3(t, 2, 3, []byte{100, 101}, []byte{102, 103, 104})
-	Buffer3(t, 2, 4, []byte{100, 101}, []byte{102, 103, 104, 105})
-	Buffer3(t, 2, 5, []byte{100, 101}, []byte{102, 103, 104, 105, 106})
-	Buffer3(t, 2, 6, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107})
-	Buffer3(t, 2, 7, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108})
-	Buffer3(t, 2, 8, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109})
-	Buffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
+func TestReadBuffer3(t *testing.T) {
+	readBuffer3(t, 0, 1, []byte{}, []byte{100})
+	readBuffer3(t, 1, 0, []byte{100}, []byte{})
+	readBuffer3(t, 1, 1, []byte{100}, []byte{101})
+	readBuffer3(t, 1, 2, []byte{100}, []byte{101, 102})
+	readBuffer3(t, 1, 3, []byte{100}, []byte{101, 102, 103})
+	readBuffer3(t, 1, 4, []byte{100}, []byte{101, 102, 103, 104})
+	readBuffer3(t, 1, 5, []byte{100}, []byte{101, 102, 103, 104, 105})
+	readBuffer3(t, 1, 6, []byte{100}, []byte{101, 102, 103, 104, 105, 106})
+	readBuffer3(t, 1, 7, []byte{100}, []byte{101, 102, 103, 104, 105, 106, 107})
+	readBuffer3(t, 2, 1, []byte{100, 101}, []byte{102})
+	readBuffer3(t, 2, 2, []byte{100, 101}, []byte{102, 103})
+	readBuffer3(t, 2, 3, []byte{100, 101}, []byte{102, 103, 104})
+	readBuffer3(t, 2, 4, []byte{100, 101}, []byte{102, 103, 104, 105})
+	readBuffer3(t, 2, 5, []byte{100, 101}, []byte{102, 103, 104, 105, 106})
+	readBuffer3(t, 2, 6, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107})
+	readBuffer3(t, 2, 7, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108})
+	readBuffer3(t, 2, 8, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109})
+	readBuffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
 }
