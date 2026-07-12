@@ -44,20 +44,16 @@ func appendSize2(dest []byte, le int) []byte {
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
 }
 
-func dumpSize2(src []byte) (size int) {
+func dumpSize2(src []byte) int {
+	var size uint16
 	copy(Slice(Ptr(&size), TSSD_SIZEA_LENGTH), src)
-	return size
+	return int(size)
 }
 
-/*
-func appendSize4(dest []byte, le int) []byte {
-	l := uint32(le)
-	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
-}*/
-
-func dumpSize4(src []byte) (size int) {
+func dumpSize4(src []byte) int {
+	var size uint32
 	copy(Slice(Ptr(&size), TSSD_SIZET_LENGTH), src)
-	return size
+	return int(size)
 }
 
 // check and dump sizet
