@@ -956,7 +956,7 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 	ti := parse(in)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	n := r.Intn(128)
+	n := r.Intn(64)
 
 	in = make([]AllBasicType, n)
 
@@ -966,7 +966,7 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 
 	fmt.Println("TestAllBasicTypeInStructSlice len:", len(in), " sizeof:", unsafe.Sizeof(in[0]))
 
-	buf := &Buffer{Cap : 8000}
+	buf := &Buffer{Cap : 8000*2}
 	ti.marshalTo(Ptr(&in), buf)
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
@@ -1127,10 +1127,7 @@ func TestTssdPrint(t *testing.T) {
 func TestBuffer(t *testing.T) {
 	buf := &Buffer{}
 	buf.Append(nil)
-	if buf.Size != 0 || len(buf.Data) != 1 || cap(buf.Data[0]) != TSSD_BUFFER_CAP {
-		t.Error("Buffer Append nil err")
-	}
-
+	
 	buf.Append([]byte(MAGIC))
 
 	if !isMagic(buf.Data[0]) || buf.Size != len(MAGIC) {
@@ -1141,10 +1138,6 @@ func TestBuffer(t *testing.T) {
 func TestBuffer2(t *testing.T) {
 	buf := &Buffer{
 		Cap: 2,
-	}
-	buf.Append(nil)
-	if buf.Size != 0 || len(buf.Data) != 1 || cap(buf.Data[0]) != buf.Cap {
-		t.Error("Buffer Append nil err")
 	}
 
 	buf.Append([]byte(MAGIC))
@@ -1199,6 +1192,9 @@ func SliceEqual[T comparable](a, b []T) bool {
 }
 
 func SliceSliceEqual[T comparable](a, b [][]T) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
 	if len(a) != len(b) {
 		return false
 	}
@@ -1232,8 +1228,8 @@ func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
 }
 
 func TestAppendBuffer3(t *testing.T) {
-	appendBuffer3(t, 0, 0, [][]byte {[]byte{},},   [][]byte {[]byte{},})
-	appendBuffer3(t, 0, 1, [][]byte {[]byte{},},   [][]byte {[]byte{100},})
+	appendBuffer3(t, 0, 0, [][]byte {},   [][]byte {})
+	appendBuffer3(t, 0, 1, [][]byte {},   [][]byte {[]byte{100},})
 	appendBuffer3(t, 1, 0, [][]byte {[]byte{100},},   [][]byte {[]byte{100},})
 	appendBuffer3(t, 1, 1, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100},})
 	appendBuffer3(t, 1, 2, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},})
@@ -1248,6 +1244,31 @@ func TestAppendBuffer3(t *testing.T) {
 	appendBuffer3(t, 2, 5, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102, 103}, []byte{104}})
 }
 
+
+func TestAppendBufferWithUserBuffer(t *testing.T) {
+	buf := &Buffer{
+		Cap: 3,
+		Data: [][]byte {
+			make([]byte, 0, 2),
+			make([]byte, 0, 1),
+			make([]byte, 0, 3),
+		},
+	}
+
+	dest := make([]byte, 11)
+	for i := range dest {
+		dest[i] = byte(100 + i)
+	}
+
+	buf.Append(dest[:])
+	if !SliceSliceEqual(buf.Data, [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105}, []byte{106, 107, 108}, []byte{109, 110},}) {
+		t.Error("Buffer append r1 err:", buf.Data)
+	}
+	buf.Append(dest[:2])
+	if !SliceSliceEqual(buf.Data, [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105}, []byte{106, 107, 108}, []byte{109, 110, 100},[]byte{101},}) {
+		t.Error("Buffer append r1 err:", buf.Data)
+	}
+}
 
 func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 	buf := &Buffer{

@@ -114,11 +114,12 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 }
 
 type Buffer struct {
-	Cap   int
-	Size  int //total size
-	index int
-	pos   int
-	Data  [][]byte
+	Cap    int
+	Size   int //total size
+	index  int //read index
+	pos    int
+	windex int //write index
+	Data   [][]byte
 }
 
 func (buf *Buffer) writePos() (int, int) {
@@ -127,26 +128,25 @@ func (buf *Buffer) writePos() (int, int) {
 }
 
 func (buf *Buffer) Append(bs []byte) *Buffer {
-	if len(buf.Data) == 0 {
-		if buf.Cap == 0 {
-			buf.Cap = TSSD_BUFFER_CAP
-		}
-		buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
-	}
 	for len(bs) > 0 {
-		w := len(buf.Data) - 1
-		if len(buf.Data[w])+len(bs) <= cap(buf.Data[w]) {
-			buf.Data[w] = append(buf.Data[w], bs...)
+		if buf.windex == len(buf.Data) {
+			if buf.Cap == 0 {
+				buf.Cap = TSSD_BUFFER_CAP
+			}
+			buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
+		}
+
+		if len(buf.Data[buf.windex])+len(bs) <= cap(buf.Data[buf.windex]) {
+			buf.Data[buf.windex] = append(buf.Data[buf.windex], bs...)
 			buf.Size += len(bs)
 			return buf
 		}
 
-		fill := cap(buf.Data[w]) - len(buf.Data[w])
-		buf.Data[w] = append(buf.Data[w], bs[:fill]...)
+		fill := cap(buf.Data[buf.windex]) - len(buf.Data[buf.windex])
+		buf.Data[buf.windex] = append(buf.Data[buf.windex], bs[:fill]...)
 		buf.Size += fill
-		//TODO, how can we let user supply Data ?
-		buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
 		bs = bs[fill:]
+		buf.windex++
 	}
 	//return self let us call in chain
 	return buf
