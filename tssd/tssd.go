@@ -105,9 +105,7 @@ func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
 		Magic: [5]byte{'T', 'S', 'S', 'D', 'V'},
 	}
 
-	header.Version[0] = buf[5]
-	header.Version[1] = buf[6]
-
+	copy(header.Version[:], buf[5:])
 	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
 		return nil, buf, err
 	}
