@@ -54,14 +54,14 @@ func (factory *factory) validate(header Header) error {
 	return nil
 }
 
-func (factory *factory) marshalTo(flat Flatable, dest []byte) ([]byte, error) {
+func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
-		return nil, ErrorTSSDDataSchemaReject
+		return ErrorTSSDDataSchemaReject
 	}
 
-	dest = appendHeader(dest, flat.Schema())
-	return bi.info.marshal(flat, dest)
+	appendHeader(buf, flat.Schema())
+	return bi.info.marshalTo(flat, buf)
 }
 
 // UnmarshalTo direct unmarshal to your object

@@ -144,13 +144,14 @@ func TestSaveDumpMapStruct(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
+	fmt.Println("buf:", buf)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	_, err := c.unmarshal(buf.Data[0], &s2)
 
-	fmt.Println(s1, s2)
+	fmt.Println("s1:", s1, " err:", err, " s2:", s2)
 	if !reflect.DeepEqual(s1, s2) {
 		t.Error("TestSaveDumpMapStruct error")
 	}
@@ -224,11 +225,11 @@ func TestSaveDumpMapSimple(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -252,11 +253,11 @@ func TestSaveDumpMapString(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -265,6 +266,7 @@ func TestSaveDumpMapString(t *testing.T) {
 }
 
 func TestSaveDumpMapSimpleSlice(t *testing.T) {
+	
 
 	type stmap struct {
 		I int
@@ -279,16 +281,16 @@ func TestSaveDumpMapSimpleSlice(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
 		t.Error("TestSaveDumpMapSimpleSlice error")
 	}
-
+		
 }
 
 func TestSaveDumpMapStructSlice(t *testing.T) {
@@ -310,11 +312,11 @@ func TestSaveDumpMapStructSlice(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -343,11 +345,11 @@ func TestSaveDumpMapStructSlice2(t *testing.T) {
 	}
 
 	c := parse(s0)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -376,11 +378,11 @@ func TestSaveDumpMapSlice(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -409,11 +411,11 @@ func TestSaveDumpMapArray(t *testing.T) {
 	}
 
 	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	c.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -457,9 +459,9 @@ func TestMapArraySlice(t *testing.T) {
 	s1.M[1]["o2"] = 133
 
 	container := parse(s1)
-	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf, &s2)
+	container.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 
@@ -470,6 +472,7 @@ func TestMapArraySlice(t *testing.T) {
 	}
 }
 
+
 func TestMapInMapEmpty(t *testing.T) {
 	type si struct {
 		S string
@@ -477,8 +480,8 @@ func TestMapInMapEmpty(t *testing.T) {
 	}
 
 	type so struct {
-		I int
-		M map[string]si
+		I  int
+		M  map[string]si
 	}
 
 	var si1 si
@@ -499,15 +502,16 @@ func TestMapInMapEmpty(t *testing.T) {
 	//s1.Si = si1
 	//s1.S = "sfe"
 
-	s1.M = make(map[string]si)
+	s1.M= make(map[string]si)
 	s1.M["o1"] = si1
 
 	//s1.M[1] = make(map[string]int)
 	//s1.M[1]["o2"] = 133
 
-	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	
+	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf, &s2)
+	container.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 
@@ -518,6 +522,7 @@ func TestMapInMapEmpty(t *testing.T) {
 	}
 }
 
+
 func TestMapInMap(t *testing.T) {
 	type si struct {
 		S string
@@ -525,8 +530,8 @@ func TestMapInMap(t *testing.T) {
 	}
 
 	type so struct {
-		I int
-		M map[string]si
+		I  int
+		M  map[string]si
 	}
 
 	var si1 si
@@ -547,15 +552,16 @@ func TestMapInMap(t *testing.T) {
 	//s1.Si = si1
 	//s1.S = "sfe"
 
-	s1.M = make(map[string]si)
+	s1.M= make(map[string]si)
 	s1.M["o1"] = si1
 
 	//s1.M[1] = make(map[string]int)
 	//s1.M[1]["o2"] = 133
 
-	buf, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	
+	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf, &s2)
+	container.unmarshal(buf.Data[0], &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 

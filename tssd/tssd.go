@@ -3,6 +3,7 @@ package tssd
 import (
 	"errors"
 	"fmt"
+	"unsafe"
 )
 
 const (
@@ -73,22 +74,18 @@ func init() {
 	schemaTypeInfo = parse(Schema{})
 }
 
-func (this *Schema) Marshal(to []byte) (ret []byte) {
-	ret, _ = schemaTypeInfo.marshal(this, to)
-	return ret
+func (this *Schema) Marshal(buf *Buffer) error {
+	return schemaTypeInfo.marshalTo(this, buf)
 }
 
 func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
 	return schemaTypeInfo.unmarshal(from, this)
 }
 
-func appendHeader(buf []byte, schema Schema) []byte {
-	buf = append(buf, MAGIC...)
-	buf = append(buf, []byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR}...)
-	buf = append(buf, byte(Tschema))
-	//buf.Append([]byte(MAGIC))
-	//buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
-	return schema.Marshal(buf)
+func appendHeader(buf *Buffer, schema Schema) error {
+	buf.Append([]byte(MAGIC))
+	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
+	return (&schema).Marshal(buf)
 }
 
 func isMagic(buf []byte) bool {
@@ -126,7 +123,12 @@ type Buffer struct {
 	Data  [][]byte
 }
 
-func (buf *Buffer) Append(bs []byte) {
+func (buf *Buffer) writePos() (int, int) {
+	idx := len(buf.Data) - 1
+	return idx, len(buf.Data[idx])
+}
+
+func (buf *Buffer) Append(bs []byte) *Buffer {
 	if len(buf.Data) == 0 {
 		if buf.Cap == 0 {
 			buf.Cap = TSSD_BUFFER_CAP
@@ -135,18 +137,25 @@ func (buf *Buffer) Append(bs []byte) {
 	}
 	for len(bs) > 0 {
 		w := len(buf.Data) - 1
-		if len(buf.Data[w])+len(bs) <= buf.Cap {
+		if len(buf.Data[w])+len(bs) <= cap(buf.Data[w]) {
 			buf.Data[w] = append(buf.Data[w], bs...)
 			buf.Size += len(bs)
-			return
+			return buf
 		}
 
-		fill := buf.Cap - len(buf.Data[w])
+		fill := cap(buf.Data[w]) - len(buf.Data[w])
 		buf.Data[w] = append(buf.Data[w], bs[:fill]...)
 		buf.Size += fill
+		//TODO, how can we let user supply Data ?
 		buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
 		bs = bs[fill:]
 	}
+	//return self let us call in chain
+	return buf
+}
+
+func (buf *Buffer) AppendByte(b byte) *Buffer {
+	return buf.Append([]byte{b})
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -186,4 +195,31 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 		buf.index++
 	}
 	return result, nil
+}
+
+func (buf *Buffer) appendSize2(le int) *Buffer {
+	l := uint16(le)
+	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
+}
+
+func (buf *Buffer) appendSize4(le int) *Buffer {
+	l := uint32(le)
+	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
+}
+
+func (buf *Buffer) appendString(s string) *Buffer {
+	return buf.appendSize4(len(s)).Append([]byte(s))
+}
+
+func (buf *Buffer) updateSize(index, pos, value int) {
+	l := uint32(value)
+	s := Slice(Ptr(&l), unsafe.Sizeof(l))
+	for i := 0; i < len(s); i++ {
+		buf.Data[index][pos] = s[i]
+		pos++
+		if pos >= buf.Cap {
+			pos = 0
+			index++
+		}
+	}
 }

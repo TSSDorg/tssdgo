@@ -164,14 +164,14 @@ func TestStudent(t *testing.T) {
 
 	n, _ := tssd.Marshal(&v)
 
-	if len(n) == 0 {
+	if len(n.Data[0]) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	tssd.Print(&v, n)
+	tssd.Print(&v, n.Data[0])
 
 	var v2 Student
-	tssd.UnmarshalTo(n, &v2)
+	tssd.UnmarshalTo(n.Data[0], &v2)
 	fmt.Println("-----v:", v)
 	fmt.Println("-----v2:", v2)
 	if !v.Equal(&v2) {
@@ -180,13 +180,13 @@ func TestStudent(t *testing.T) {
 
 	
 	n, _ = tssd.Marshal(&v2)
-	if len(n) == 0 {
+	if len(n.Data[0]) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
 	var v3 Student
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(n.Data[0], &v3)
 	if !v3.Equal(&v) {
 		t.Error("TestStruct student failed")
 	}
@@ -194,11 +194,11 @@ func TestStudent(t *testing.T) {
 	v2.Address = v2.Address[:0]
 
 	n, _ = tssd.Marshal(&v2)
-	if len(n) == 0 {
+	if len(n.Data[0]) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(n.Data[0], &v3)
 	if !v3.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
@@ -227,13 +227,13 @@ func TestPrintMap(t *testing.T) {
 	
 	tssd.Register(&s1)
 
-	n, _ := tssd.MarshalTo(&s1, make([]byte, 0, 2048))
+	n, _ := tssd.Marshal(&s1)
 
-	if len(n) == 0 {
+	if len(n.Data[0]) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	tssd.Print(&s1, n)
+	tssd.Print(&s1, n.Data[0])
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
 
 	out := []byte{112, 104, 105, 115, 105,}
@@ -242,7 +242,7 @@ func TestPrintMap(t *testing.T) {
 
 	var sout student
 	
-	tssd.UnmarshalTo(n, &sout)
+	tssd.UnmarshalTo(n.Data[0], &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)
 }

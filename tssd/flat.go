@@ -125,15 +125,16 @@ func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {
 	return this
 }
 
-func Marshal(flat Flatable) ([]byte, error) {
-	return MarshalTo(flat, make([]byte, 0, 4096))
+func Marshal(flat Flatable) (*Buffer, error) {
+	buf := new(Buffer)
+	return buf, MarshalTo(flat, buf)
 }
 
-func MarshalTo(flat Flatable, to []byte) ([]byte, error) {
+func MarshalTo(flat Flatable, buf *Buffer) error {
 	if factory, ok := groups[flat.Group()]; ok {
-		return factory.marshalTo(flat, to)
+		return factory.marshalTo(flat, buf)
 	}
-	return nil, ErrorTSSDDataUnregister
+	return ErrorTSSDDataUnregister
 }
 
 func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {

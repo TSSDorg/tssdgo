@@ -11,9 +11,9 @@ import (
 
 type Ptr = unsafe.Pointer
 type Size_t = uintptr
-type saveFunc = func(*typeInfo, Ptr, []byte) ([]byte, error)
+type saveFunc = func(*typeInfo, Ptr, *Buffer) error
 type dumpFunc = func(*typeInfo, []byte, Ptr) ([]byte, error)
-type mapSave = func(*typeInfo, reflect.Value, []byte) ([]byte, error) //map save func
+type mapSave = func(*typeInfo, reflect.Value, *Buffer) error          //map save func
 type mapDump = func(*typeInfo, []byte) (reflect.Value, []byte, error) //map dump func
 
 type typeInfo struct {
@@ -49,10 +49,11 @@ func dumpSize2(src []byte) (size int) {
 	return size
 }
 
+/*
 func appendSize4(dest []byte, le int) []byte {
 	l := uint32(le)
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
-}
+}*/
 
 func dumpSize4(src []byte) (size int) {
 	copy(Slice(Ptr(&size), TSSD_SIZET_LENGTH), src)
@@ -85,20 +86,18 @@ func checkDumpSize(src []byte) (sizet int, sizea int, remain []byte, err error) 
 	return sizet, sizea, remain[TSSD_SIZEA_LENGTH:], nil
 }
 
+/*
 func appendString(dest []byte, s string) []byte {
 	return append(appendSize4(dest, len(s)), s...)
-}
+}*/
 
 func (info *typeInfo) types() []byte {
 	return info.stype
 }
 
-func (ti *typeInfo) memAppend(src Ptr, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type))
-	//dest = dest[0:len(dest)+ti.size]
-	return append(dest, Slice(src, Size_t(ti.size))...), nil
-	//copy(dest[len(dest):], Slice(src, Size_t(ti.size)))
-	//return dest, nil
+func (ti *typeInfo) memAppend(src Ptr, buf *Buffer) error {
+	buf.AppendByte(byte(ti.Type)).Append(Slice(src, Size_t(ti.size)))
+	return nil
 }
 
 func (ti *typeInfo) memDump(src []byte, dest Ptr) ([]byte, error) {
@@ -123,16 +122,14 @@ func (ti *typeInfo) memDump(src []byte, dest Ptr) ([]byte, error) {
 	return src[TSSD_TYPE_LENGTH+ti.size:], nil
 }
 
-func (ti *typeInfo) timeSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) timeSave(src Ptr, buf *Buffer) error {
 	p := (*time.Time)(src)
-
-	dest = append(dest, byte(ti.Type))
-	dest = append(dest, byte(Tstring))
-	return appendString(dest, p.Format(time.RFC3339Nano)), nil
+	buf.Append([]byte{byte(ti.Type), byte(Tstring)}).appendString(p.Format(time.RFC3339Nano))
+	return nil
 }
 
 func (ti *typeInfo) timeDump(src []byte, dest Ptr) ([]byte, error) {
-	if len(src) < TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH {
+	if len(src) < TSSD_TYPE_LENGTH+TSSD_TYPE_LENGTH {
 		//TODO, add field name info
 		return src, ErrorInSufficientData
 	}
@@ -162,11 +159,10 @@ func (ti *typeInfo) timeDump(src []byte, dest Ptr) ([]byte, error) {
 	}
 }
 
-func (ti *typeInfo) strSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) strSave(src Ptr, buf *Buffer) error {
 	p := (*string)(src)
-
-	dest = append(dest, byte(ti.Type))
-	return appendString(dest, *p), nil
+	buf.AppendByte(byte(ti.Type)).appendString(*p)
+	return nil
 }
 
 func (ti *typeInfo) strDump(src []byte, dest Ptr) ([]byte, error) {
@@ -191,17 +187,18 @@ func (ti *typeInfo) strDump(src []byte, dest Ptr) ([]byte, error) {
 	}
 }
 
-func (ti *typeInfo) objSave(src Ptr, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)            //reserved total Size (S)
-	dest = appendSize2(dest, len(ti.info)) //S
-	for i := range len(ti.info) {
-		dest, _ = ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), dest)
-	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
+func (ti *typeInfo) objSave(src Ptr, buf *Buffer) error {
 
-	return dest, nil
+	buf.AppendByte(byte(ti.Type))
+
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(ti.info))
+	for i := range len(ti.info) {
+		ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), buf)
+	}
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
 func (ti *typeInfo) objDump(src []byte, dest Ptr) (remain []byte, err error) {
@@ -235,7 +232,7 @@ func (ti *typeInfo) objDump(src []byte, dest Ptr) (remain []byte, err error) {
 	}
 }
 
-func (ti *typeInfo) sliceSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) sliceSave(src Ptr, buf *Buffer) error {
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
@@ -245,16 +242,17 @@ func (ti *typeInfo) sliceSave(src Ptr, dest []byte) ([]byte, error) {
 		}
 	}
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
 
+	index, pos := buf.writePos()
+	size := buf.Size
+
+	buf.appendSize4(0).appendSize2(arrayN)
 	for i := range arrayN {
-		dest, _ = ti.info[0].save(&ti.info[0], Ptr(addr+Size_t(ti.info[0].size*i)), dest)
+		ti.info[0].save(&ti.info[0], Ptr(addr+Size_t(ti.info[0].size*i)), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
 func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
@@ -299,7 +297,7 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 }
 
 // [Tarraym][Ttype][size][arrayN][data]
-func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mergeSliceSave(src Ptr, buf *Buffer) error {
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
@@ -309,15 +307,12 @@ func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 		}
 	}
 
-	dest = append(dest, byte(ti.Type))         //T
-	dest = append(dest, byte(ti.info[0].Type)) // we add a element data type after T
-
+	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
 	totalSize := ti.info[0].size * arrayN
-	dest = appendSize4(dest, 2+totalSize) //arrayN  + total Size
-	dest = appendSize2(dest, arrayN)      //S
+	buf.appendSize4(TSSD_SIZEA_LENGTH + totalSize).appendSize2(arrayN)
 
-	//TODO, for big-endian, we need copy one by one
-	return append(dest, Slice(Ptr(addr), Size_t(totalSize))...), nil
+	buf.Append(Slice(Ptr(addr), Size_t(totalSize)))
+	return nil
 }
 
 func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err error) {
@@ -358,26 +353,26 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 	return src[TSSD_TYPE_LENGTH+TSSD_TYPE_LENGTH+TSSD_SIZET_LENGTH+sizet:], nil
 }
 
-func (ti *typeInfo) dictSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) dictSave(src Ptr, buf *Buffer) error {
 
 	value := reflect.NewAt(ti.rtype, src).Elem()
 	keys := value.MapKeys()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)         //reserved total Size (S)
-	dest = appendSize2(dest, len(keys)) //S
+	buf.AppendByte(byte(ti.Type))
+
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(keys))
 
 	for _, k := range keys {
 		v := value.MapIndex(k)
-		dest = append(dest, byte(Tdictk))
-		dest, _ = ti.info[0].mapSave(&ti.info[0], k, dest)
-		dest = append(dest, byte(Tdictv))
-		dest, _ = ti.info[1].mapSave(&ti.info[1], v, dest)
+		buf.AppendByte(byte(Tdictk))
+		ti.info[0].mapSave(&ti.info[0], k, buf)
+		buf.AppendByte(byte(Tdictv))
+		ti.info[1].mapSave(&ti.info[1], v, buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
 func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
@@ -434,11 +429,16 @@ func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
 	}
 }
 
-func (ti *typeInfo) marshal(src any, dest []byte) ([]byte, error) {
+func (ti *typeInfo) marshal(src any) (*Buffer, error) {
+	buf := new(Buffer)
+	return buf, ti.marshalTo(src, buf)
+}
+
+func (ti *typeInfo) marshalTo(src any, buf *Buffer) error {
 	value := reflect.ValueOf(src)
 	obj := value.Pointer()
 
-	return ti.save(ti, Ptr(obj), dest)
+	return ti.save(ti, Ptr(obj), buf)
 }
 
 func (ti *typeInfo) unmarshal(src []byte, dest any) ([]byte, error) {

@@ -133,11 +133,11 @@ func TestUnmarshalDecorate(t *testing.T) {
 		Age: age,
 	}
 
-	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
+	buf, _ := tssd.Marshal(&st)
 
 	var s1 student_V1
 	//buf input by v1, you can receive v1
-	_, err := tssd.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf.Data[0], &s1);
 	if  err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
@@ -146,20 +146,20 @@ func TestUnmarshalDecorate(t *testing.T) {
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = tssd.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress{
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	_, err = tssd.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
 	//but you can receive a latest one
-	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
+	flat, _, err := tssd.Unmarshal(buf.Data[0], DECORATE_STUDENT_GROUP)
 	if  err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
@@ -193,7 +193,7 @@ func TestUnmarshalDecorate2(t *testing.T) {
 		Age: age,
 	}
 
-	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
+	buf, _ := tssd.Marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
 	tssd.Register(&student{})
@@ -205,27 +205,27 @@ func TestUnmarshalDecorate2(t *testing.T) {
 
 	var s1 student_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := tssd.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf.Data[0], &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = tssd.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	_, err = tssd.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
 	//but you can receive a latest one with a group name
-	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
+	flat, _, err := tssd.Unmarshal(buf.Data[0], DECORATE_STUDENT_GROUP)
 	if  err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
@@ -246,7 +246,7 @@ func TestUnmarshalDecorate3(t *testing.T) {
 		Age: age,
 	}
 
-	buf, _ := tssd.MarshalTo(&st, make([]byte, 0, 4096))
+	buf, _ := tssd.Marshal(&st)
 
 	//1. user should New a tssd facory with the new version object
 	tssd.Register(&student{})
@@ -258,26 +258,26 @@ func TestUnmarshalDecorate3(t *testing.T) {
 
 	var s1 student_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := tssd.UnmarshalTo(buf, &s1);
+	_, err := tssd.UnmarshalTo(buf.Data[0], &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	_, err = tssd.UnmarshalTo(buf, &s2);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s2);
 	if  err == nil {
 		t.Errorf("unmarshalTo v2 should fail")
 	}
 
 	var s3 student
-	_, err = tssd.UnmarshalTo(buf, &s3);
+	_, err = tssd.UnmarshalTo(buf.Data[0], &s3);
 	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address[0] {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
 	//but you can receive a latest one
-	flat, _, err := tssd.Unmarshal(buf, DECORATE_STUDENT_GROUP)
+	flat, _, err := tssd.Unmarshal(buf.Data[0], DECORATE_STUDENT_GROUP)
 	if  err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}

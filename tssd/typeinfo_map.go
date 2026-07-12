@@ -17,7 +17,7 @@ func uintSrcAddr(value reflect.Value) Ptr {
 	return Ptr(&s)
 }
 
-var simpleSave map[reflect.Kind]srcAddr = map[reflect.Kind]srcAddr{
+var simpleSave = map[reflect.Kind]srcAddr{
 	reflect.Bool: func(value reflect.Value) Ptr {
 		s := value.Bool()
 		return Ptr(&s)
@@ -79,9 +79,9 @@ var simpleDump map[reflect.Kind]destAddr = map[reflect.Kind]destAddr{
 	},
 }
 
-func (ti *typeInfo) mapSimpleSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapSimpleSave(value reflect.Value, buf *Buffer) error {
 	s := simpleSave[ti.rtype.Kind()](value)
-	return ti.memAppend(s, dest)
+	return ti.memAppend(s, buf)
 }
 
 func (ti *typeInfo) mapSimpleDump(src []byte) (reflect.Value, []byte, error) {
@@ -90,9 +90,9 @@ func (ti *typeInfo) mapSimpleDump(src []byte) (reflect.Value, []byte, error) {
 	return reflect.NewAt(ti.rtype, d).Elem(), src, nil
 }
 
-func (ti *typeInfo) mapStrSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapStrSave(value reflect.Value, buf *Buffer) error {
 	s := value.String()
-	return ti.strSave(Ptr(&s), dest)
+	return ti.strSave(Ptr(&s), buf)
 }
 
 func (ti *typeInfo) mapStrDump(src []byte) (reflect.Value, []byte, error) {
@@ -102,9 +102,9 @@ func (ti *typeInfo) mapStrDump(src []byte) (reflect.Value, []byte, error) {
 	return reflect.ValueOf(s), src, nil
 }
 
-func (ti *typeInfo) mapTimeSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapTimeSave(value reflect.Value, buf *Buffer) error {
 	s := value.Interface().(time.Time)
-	return ti.timeSave(Ptr(&s), dest)
+	return ti.timeSave(Ptr(&s), buf)
 }
 
 func (ti *typeInfo) mapTimeDump(src []byte) (reflect.Value, []byte, error) {
@@ -114,16 +114,16 @@ func (ti *typeInfo) mapTimeDump(src []byte) (reflect.Value, []byte, error) {
 	return reflect.ValueOf(s), src, nil
 }
 
-func (ti *typeInfo) mapStructSave(value reflect.Value, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)            //reserved total Size (S)
-	dest = appendSize2(dest, len(ti.info)) //S
+func (ti *typeInfo) mapStructSave(value reflect.Value, buf *Buffer) error {
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(ti.info))
 	for i := range len(ti.info) {
-		dest, _ = ti.info[i].mapSave(&ti.info[i], value.Field(i), dest)
+		ti.info[i].mapSave(&ti.info[i], value.Field(i), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
 func (ti *typeInfo) mapStructDump(src []byte) (v reflect.Value, remain []byte, err error) {
@@ -162,19 +162,19 @@ func (ti *typeInfo) mapStructDump(src []byte) (v reflect.Value, remain []byte, e
 	}
 }
 
-func (ti *typeInfo) mapSliceValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapSliceValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(arrayN)
 	for i := range arrayN {
-		dest, _ = ti.info[0].mapSave(&ti.info[0], value.Index(i), dest)
+		ti.info[0].mapSave(&ti.info[0], value.Index(i), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
 func (ti *typeInfo) mapSliceValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
@@ -209,27 +209,23 @@ func (ti *typeInfo) mapSliceValueDump(src []byte) (v reflect.Value, remain []byt
 	}
 }
 
-func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
-
-	dest = append(dest, byte(ti.Type))         //Tarraym
-	dest = append(dest, byte(ti.info[0].Type)) //Telement
-
+	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
 	totalSize := ti.info[0].size * arrayN
-	dest = appendSize4(dest, totalSize) //total Size
-	dest = appendSize2(dest, arrayN)    //S
+	buf.appendSize4(totalSize).appendSize2(arrayN)
 
 	for i := range arrayN {
 		s := simpleSave[ti.info[0].rtype.Kind()](value.Index(i))
-		dest = append(dest, Slice(Ptr(s), Size_t(ti.info[0].size))...)
+		buf.Append(Slice(Ptr(s), Size_t(ti.info[0].size)))
 	}
-	return dest, nil
+	return nil
 }
 
 func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
 
-	if len(src) < TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH {
+	if len(src) < TSSD_TYPE_LENGTH+TSSD_TYPE_LENGTH {
 		//TODO, add field name info
 		return v, src, ErrorInSufficientData
 	}
@@ -263,26 +259,27 @@ func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain 
 	}
 }
 
-func (ti *typeInfo) mapMapValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapMapValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+
+	buf.appendSize4(0).appendSize2(arrayN)
 
 	keys := value.MapKeys()
 	for _, k := range keys {
 		v := value.MapIndex(k)
-		dest = append(dest, byte(Tdictk))
-		dest, _ = ti.info[0].mapSave(&ti.info[0], k, dest)
-		dest = append(dest, byte(Tdictv))
-		dest, _ = ti.info[1].mapSave(&ti.info[1], v, dest)
+		buf.AppendByte(byte(Tdictk))
+		ti.info[0].mapSave(&ti.info[0], k, buf)
+		buf.AppendByte(byte(Tdictv))
+		ti.info[1].mapSave(&ti.info[1], v, buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
 
-	return dest, nil
+	return nil
 }
 
 func (ti *typeInfo) mapMapValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
