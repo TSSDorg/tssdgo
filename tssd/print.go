@@ -27,19 +27,19 @@ func (node *Node) print() {
 	}
 }
 
-func dprintf[T comparable](info *typeInfo, format string, buf []byte) (string, []byte) {
+func dprintf[T comparable](info *typeInfo, format string, buf *Buffer) (string, error) {
 	var d T
-	remain, _ := info.dump(info, buf, Ptr(&d))
-	return fmt.Sprintf(format, info.name, info.rtype.String(), d), remain
+	err := info.dump(info, buf, Ptr(&d))
+	return fmt.Sprintf(format, info.name, info.rtype.String(), d), err
 }
 
-func dprintf2[T comparable](info *typeInfo, format string, buf []byte) string {
+func dprintf2[T comparable](info *typeInfo, format string, buf *Buffer) (string, error) {
 	var d T
-	copy(Slice(Ptr(&d), Size_t(info.size)), buf)
-	return fmt.Sprintf(format, d)
+	_, err := buf.Read(Slice(Ptr(&d), Size_t(info.size)))
+	return fmt.Sprintf(format, d), err
 }
 
-func parseMergeArray(info *typeInfo, ttype int8, buf []byte) string {
+func parseMergeArray(info *typeInfo, ttype int8, buf *Buffer) (string, error) {
 	switch int8(ttype) {
 	case Tint8:
 		return dprintf2[int8](info, "%d,", buf)
@@ -64,119 +64,141 @@ func parseMergeArray(info *typeInfo, ttype int8, buf []byte) string {
 	case Tbool:
 		return dprintf2[bool](info, "%t,", buf)
 	}
-	return ""
+	return "", nil
 }
 
-func (info *typeInfo) parse(parent *Node, buf []byte) []byte {
-	if len(buf) == 0 {
-		return nil
+func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-	if info.Type != int8(buf[0]) && -info.Type != int8(buf[0]) {
-		fmt.Println("print parsetype mismatch ", info.Type, buf[0])
-		return buf
+
+	if info.Type != int8(b) && -info.Type != int8(b) {
+		fmt.Println("print parsetype mismatch ", b, info.Type)
+		return err
 	}
 
 	node := &Node{}
 	parent.Children = append(parent.Children, node)
-	switch int8(buf[0]) {
+	switch int8(b) {
 	case Tint8:
-		node.Content, buf = dprintf[int8](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[int8](info, "%s(%s): %d", buf)
 	case Tuint8:
-		node.Content, buf = dprintf[uint8](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[uint8](info, "%s(%s): %d", buf)
 	case Tint16:
-		node.Content, buf = dprintf[int16](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[int16](info, "%s(%s): %d", buf)
 	case Tuint16:
-		node.Content, buf = dprintf[uint16](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[uint16](info, "%s(%s): %d", buf)
 	case Tint32:
-		node.Content, buf = dprintf[int32](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[int32](info, "%s(%s): %d", buf)
 	case Tuint32:
-		node.Content, buf = dprintf[uint32](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[uint32](info, "%s(%s): %d", buf)
 	case Tint64:
-		node.Content, buf = dprintf[int64](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[int64](info, "%s(%s): %d", buf)
 	case Tuint64:
-		node.Content, buf = dprintf[uint64](info, "%s(%s): %d", buf)
+		node.Content, err = dprintf[uint64](info, "%s(%s): %d", buf)
 	case Tfloat32:
-		node.Content, buf = dprintf[float32](info, "%s(%s): %f", buf)
+		node.Content, err = dprintf[float32](info, "%s(%s): %f", buf)
 	case Tfloat64:
-		node.Content, buf = dprintf[float64](info, "%s(%s): %f", buf)
+		node.Content, err = dprintf[float64](info, "%s(%s): %f", buf)
 	case Tbool:
-		node.Content, buf = dprintf[bool](info, "%s(%s): %t", buf)
+		node.Content, err = dprintf[bool](info, "%s(%s): %t", buf)
 	case Tstring:
-		node.Content, buf = dprintf[string](info, "%s(%s): %s", buf)
+		node.Content, err = dprintf[string](info, "%s(%s): %s", buf)
 	case Ttime:
-		size, remain, err := checkDumpSizet(buf[1:])
+
+		var rfc3339Str string
+		err := info.strDump(buf, Ptr(&rfc3339Str))
 		if err != nil {
-			return buf
+			return err
 		}
 
-		rfc3339Str := string(remain[:size])
 		t, err := time.Parse(time.RFC3339Nano, rfc3339Str)
 		if err != nil {
 			fmt.Println("parse time err:", err)
-			return buf
+			return err
 		}
 		node.Content = fmt.Sprintf("%s(%s): %s", info.name, info.rtype.String(), t.Format(time.RFC3339Nano))
-		return remain[size:]
+		return nil
 	case Tobject:
-		sizet, fields, remain, err := checkDumpSize(buf)
+		sizet, fields, err := checkDumpSize(buf)
 		if err != nil {
-			return buf
+			return err
 		}
 
 		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: fields:%d)", info.name, info.rtype.String(), sizet, fields)
 		for i := range fields {
-			remain = info.info[i].parse(node, remain)
+			if err = info.info[i].parse(node, buf); err != nil {
+				return err
+			}
 		}
-		return remain
+		return nil
 	case Tarray:
-		sizet, arrayN, remain, err := checkDumpSize(buf)
+		sizet, arrayN, err := checkDumpSize(buf)
 		if err != nil {
-			return buf
+			return err
 		}
 
 		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), sizet, arrayN)
 		for i := 0; i < arrayN; i++ {
-			remain = info.info[0].parse(node, remain)
+			if err = info.info[0].parse(node, buf); err != nil {
+				return err
+			}
 		}
-		return remain
+		return nil
 	case Tarraym: //[Tarraym][Ttype][sizet][sizea][data]
-		sizet, arrayN, remain, err := checkDumpSize(buf[TSSD_TYPE_LENGTH:])
+		b, err := buf.ReadByte()
 		if err != nil {
-			return buf
+			return err
+		}
+		sizet, arrayN, err := checkDumpSize(buf)
+		if err != nil {
+			return err
 		}
 
 		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)%s[", info.name, info.rtype.String(), sizet, arrayN, info.info[0].rtype.String())
 		for i := 0; i < arrayN; i++ {
-			node.Content += parseMergeArray(&info.info[0], int8(buf[1]), remain)
-			remain = remain[info.info[0].size:]
+			s, err := parseMergeArray(&info.info[0], int8(b), buf)
+			if err != nil {
+				return err
+			}
+			node.Content += s
 		}
 		node.Content += "]"
-		return remain
+		return nil
 	case Tdict:
-		sizet, mapLen, remain, err := checkDumpSize(buf)
+		sizet, mapLen, err := checkDumpSize(buf)
 		if err != nil {
-			return buf
+			return err
 		}
 
 		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)", info.name, info.rtype.String(), sizet, mapLen)
-		fmt.Println("mapLen:", mapLen, node.Content, remain)
+		fmt.Println("mapLen:", mapLen, node.Content)
 		for k := 0; k < mapLen; k++ {
 			kvNode := &Node{
 				Content: fmt.Sprintf("KVNode[%d]", k),
 			}
 			node.Children = append(node.Children, kvNode)
-			remain = info.info[0].parse(kvNode, remain[1:])
-			remain = info.info[1].parse(kvNode, remain[1:])
+			b, err = buf.ReadByte()
+			if err != nil {
+				return err
+			}
+			info.info[0].parse(kvNode, buf)
+			b, err = buf.ReadByte()
+			if err != nil {
+				return err
+			}
+			info.info[1].parse(kvNode, buf)
 		}
 
-		return remain
+		return nil
 	default:
-		fmt.Println("error: not support type:", buf[0])
+		fmt.Println("error: not support type:", b)
 	}
-	return buf
+	return nil
 }
 
-func (info *typeInfo) print(data []byte) {
+func (info *typeInfo) print(buf Buffer) {
 
 	fmt.Printf("==TType list: Tbool: %d, Tint64: %d, Tfloat64: %d, Tstring: %d, Tarray: %d, Tarraym: %d, Ttime: %d, Tenum: %d, Tobject: %d, Tdict: %d==\n",
 		Tbool, Tint64, Tfloat64, Tstring, Tarray, Tarraym, Ttime, Tenum, Tobject, Tdict)
@@ -184,13 +206,13 @@ func (info *typeInfo) print(data []byte) {
 	root := &Node{
 		Content: fmt.Sprintf("root-%s(%s)", info.name, info.rtype.String()),
 	}
-	info.parse(root, data)
+	info.parse(root, &buf)
 
 	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
 }
 
 // print your tssd []byte
-func (factory factory) print(version string, data []byte) error {
+func (factory factory) print(version string, buf *Buffer) error {
 	if _, ok := factory.versions[version]; !ok {
 		return ErrorTSSDDataUnregister
 	}
@@ -201,8 +223,8 @@ func (factory factory) print(version string, data []byte) error {
 		Content: "TSSD",
 	}
 
-	header, remain, err := dumpHeader(data)
-	fmt.Println("after dump header:", header, remain, err, info)
+	header, err := dumpHeader(buf)
+	fmt.Println("after dump header:", header, err, info)
 	headerNode := &Node{
 		Content: "header(header)",
 		Children: []*Node{
@@ -213,16 +235,16 @@ func (factory factory) print(version string, data []byte) error {
 	}
 
 	root.Children = append(root.Children, headerNode)
-	info.parse(root, remain)
+	info.parse(root, buf)
 
 	print.Print(root, (*Node).getChildren, (*Node).getContent, true)
 	return nil
 }
 
-func Print(flat Flatable, data []byte) error {
+func Print(flat Flatable, buf Buffer) error {
 	factory, ok := groups[flat.Group()]
 	if !ok {
 		return ErrorTSSDDataUnregister
 	}
-	return factory.print(flat.Version(), data)
+	return factory.print(flat.Version(), &buf)
 }

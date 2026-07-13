@@ -65,42 +65,38 @@ func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 }
 
 // UnmarshalTo direct unmarshal to your object
-func (factory *factory) unmarshalTo(src []byte, dest Flatable) ([]byte, error) {
-	header, remain, err := dumpHeader(src)
+func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
+	header, err := dumpHeader(buf)
 	if err != nil {
-		return src, err
+		return err
 	}
 
 	if err := factory.validate(*header); err != nil {
-		return src, err
+		return err
 	}
 	if err := dest.OnHeader(*header); err != nil {
-		return src, err
+		return err
 	}
 	remoteHash := header.Schema.Hash
 	local := factory.versions[dest.Version()].hash
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
 		fmt.Printf("local schema: %s doesn't match with remote: schema[%s] hash[%s]\n", local, header.Schema, remoteHash)
-		return src, ErrorTSSDDataSchemaReject
+		return ErrorTSSDDataSchemaReject
 	}
 
 	if local == remoteHash {
-		return bi.info.unmarshalTo(remain, dest)
+		return bi.info.unmarshalTo(buf, dest)
 	}
 
 	obj := bi.builder.Build()
-	remain, err = bi.info.unmarshalTo(remain, obj)
+	err = bi.info.unmarshalTo(buf, obj)
 	if err != nil {
-		return src, err
+		return err
 	}
 
 	_, err = factory.decorate(obj, dest)
-	if err != nil {
-		return src, err
-	}
-
-	return remain, nil
+	return err
 }
 
 // chain upgate it to the latest
@@ -121,45 +117,40 @@ func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 	return nil, ErrorTSSDDataSchemaReject
 }
 
-// Unmarshal we new a current version object for user and return the remain bytes after consum
-func (factory *factory) unmarshal(src []byte) (Flatable, []byte, error) {
-	header, remain, err := dumpHeader(src)
+// Unmarshal we new a current version object for user
+func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
+	header, err := dumpHeader(buf)
 	if err != nil {
-		return nil, src, err
+		return nil, err
 	}
 
 	if err := factory.validate(*header); err != nil {
-		return nil, src, err
+		return nil, err
 	}
 
 	if err := factory.versions[factory.current].builder.OnHeader(*header); err != nil {
-		return nil, src, err
+		return nil, err
 	}
 	remoteHash := header.Schema.Hash
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
 		fmt.Printf("remote schema [%s] hash[%s] not found\n", header.Schema, remoteHash)
-		return nil, src, ErrorTSSDDataSchemaReject
+		return nil, ErrorTSSDDataSchemaReject
 	}
 	obj := bi.builder.Build()
 
-	remain, err = bi.info.unmarshalTo(remain, obj)
+	err = bi.info.unmarshalTo(buf, obj)
 	if err != nil {
-		return nil, src, err
+		return nil, err
 	}
 
 	v := obj.Progeny()
 	if len(v) == 0 || obj.Version() == factory.current {
-		return obj, remain, nil
+		return obj, nil
 	}
 
 	to := factory.versions[factory.current].builder.Build()
 
-	flat, err := factory.decorate(obj, to)
-	if err != nil {
-		return nil, src, err
-	}
-
-	return flat, remain, nil
+	return factory.decorate(obj, to)
 }

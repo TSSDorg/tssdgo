@@ -137,16 +137,16 @@ func MarshalTo(flat Flatable, buf *Buffer) error {
 	return ErrorTSSDDataUnregister
 }
 
-func UnmarshalTo(from []byte, to Flatable) (remain []byte, err error) {
+func UnmarshalTo(buf *Buffer, to Flatable) error {
 	if factory, ok := groups[to.Group()]; ok {
-		return factory.unmarshalTo(from, to)
+		return factory.unmarshalTo(buf, to)
 	}
-	return nil, ErrorTSSDDataUnregister
+	return ErrorTSSDDataUnregister
 }
 
-func Unmarshal(from []byte, group string) (to Flatable, remain []byte, err error) {
+func Unmarshal(buf *Buffer, group string) (to Flatable, err error) {
 	if factory, ok := groups[group]; ok {
-		return factory.unmarshal(from)
+		return factory.unmarshal(buf)
 	}
-	return nil, nil, ErrorTSSDDataUnregister
+	return nil, ErrorTSSDDataUnregister
 }

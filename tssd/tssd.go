@@ -78,8 +78,8 @@ func (this *Schema) Marshal(buf *Buffer) error {
 	return schemaTypeInfo.marshalTo(this, buf)
 }
 
-func (this *Schema) Unmarshal(from []byte) (remain []byte, err error) {
-	return schemaTypeInfo.unmarshal(from, this)
+func (this *Schema) Unmarshal(buf *Buffer) error {
+	return schemaTypeInfo.unmarshal(buf, this)
 }
 
 func appendHeader(buf *Buffer, schema Schema) error {
@@ -93,24 +93,22 @@ func isMagic(buf []byte) bool {
 }
 
 // [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet][sizea=3][xxxxxxx]
-func dumpHeader(buf []byte) (header *Header, remain []byte, err error) {
-	if len(buf) < 15 {
-		return nil, buf, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
+func dumpHeader(buf *Buffer) (*Header, error) {
+	bs, err := buf.Read(make([]byte, 8))
+	if err != nil {
+		return nil, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
-	if !isMagic(buf) || buf[7] != byte(Tschema) {
-		return nil, buf, fmt.Errorf("%w [magic header not 'TSSD' or version: %d schema %d invalid]", ErrorInvalidTSSDData, buf[4], buf[7])
+	if !isMagic(bs) || bs[7] != byte(Tschema) {
+		return nil, fmt.Errorf("%w [magic header not 'TSSD' or schema %d invalid]", ErrorInvalidTSSDData, bs[7])
 	}
 
-	header = &Header{
+	header := &Header{
 		Magic: [5]byte{'T', 'S', 'S', 'D', 'V'},
 	}
 
-	copy(header.Version[:], buf[5:])
-	if remain, err = (&header.Schema).Unmarshal(buf[8:]); err != nil {
-		return nil, buf, err
-	}
-
-	return
+	copy(header.Version[:], bs[5:])
+	err = (&header.Schema).Unmarshal(buf)
+	return header, err
 }
 
 type Buffer struct {
@@ -122,9 +120,23 @@ type Buffer struct {
 	Data   [][]byte
 }
 
+// reset buf's read info, let user read from begin
+func (buf *Buffer) Rewind() *Buffer {
+	buf.index, buf.pos, buf.Size = 0, 0, 0
+	for i := 0; i <= buf.windex; i++ {
+		buf.Size += len(buf.Data[i])
+	}
+	return buf
+}
+
 func (buf *Buffer) writePos() (int, int) {
 	idx := len(buf.Data) - 1
-	return idx, len(buf.Data[idx])
+	pos := len(buf.Data[idx])
+	if pos >= cap(buf.Data[idx]) {
+		pos = 0
+		idx++
+	}
+	return idx, pos
 }
 
 func (buf *Buffer) Append(bs []byte) *Buffer {
@@ -156,11 +168,17 @@ func (buf *Buffer) AppendByte(b byte) *Buffer {
 	return buf.Append([]byte{b})
 }
 
+func (buf *Buffer) ReadByte() (b byte, err error) {
+	_, err = buf.Read(Slice(Ptr(&b), TSSD_TYPE_LENGTH))
+	return b, err
+}
+
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 	if len(dest) == 0 {
 		return nil, nil
 	}
 	if buf.Size < len(dest) {
+		//should we return partial content ?
 		return nil, ErrorInSufficientData
 	}
 

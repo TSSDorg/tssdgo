@@ -128,7 +128,7 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 
 	var s1 worker_V1
 	//buf input by v1, you can receive v1
-	_, err := tssd.UnmarshalTo(buf.Data[0], &s1);
+	err := tssd.UnmarshalTo(buf, &s1);
 	if  err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
@@ -138,7 +138,7 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	var s2 worker_V2
 	tssd.Register(&worker_V2{})
 	//buf input by v1, you can receive v2
-	_, err = tssd.UnmarshalTo(buf.Data[0], &s2);
+	err = tssd.UnmarshalTo(buf.Rewind(), &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress{
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
@@ -162,14 +162,14 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 
 	var s1 worker_V1
 	//buf input by v2, you can't downgrade to v1
-	_, err := tssd.UnmarshalTo(buf.Data[0], &s1);
+	err := tssd.UnmarshalTo(buf, &s1);
 	if  err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 worker_V2
 	//buf input by v1, you can receive v2
-	_, err = tssd.UnmarshalTo(buf.Data[0], &s2);
+	err = tssd.UnmarshalTo(buf.Rewind(), &s2);
 	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")

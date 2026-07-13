@@ -149,7 +149,7 @@ func TestSaveDumpMapStruct(t *testing.T) {
 	fmt.Println("buf:", buf)
 
 	var s2 stmap
-	_, err := c.unmarshal(buf.Data[0], &s2)
+	err := c.unmarshal(buf, &s2)
 
 	fmt.Println("s1:", s1, " err:", err, " s2:", s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -229,7 +229,7 @@ func TestSaveDumpMapSimple(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -257,7 +257,7 @@ func TestSaveDumpMapString(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -284,7 +284,7 @@ func TestSaveDumpMapSimpleSlice(t *testing.T) {
 	buf, _ := c.marshal(&s1)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -316,7 +316,7 @@ func TestSaveDumpMapStructSlice(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -349,7 +349,7 @@ func TestSaveDumpMapStructSlice2(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -382,7 +382,7 @@ func TestSaveDumpMapSlice(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -415,7 +415,7 @@ func TestSaveDumpMapArray(t *testing.T) {
 	fmt.Println(c)
 
 	var s2 stmap
-	c.unmarshal(buf.Data[0], &s2)
+	c.unmarshal(buf, &s2)
 
 	fmt.Println(s1, s2)
 	if !reflect.DeepEqual(s1, s2) {
@@ -461,7 +461,7 @@ func TestMapArraySlice(t *testing.T) {
 	container := parse(s1)
 	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf.Data[0], &s2)
+	container.unmarshal(buf, &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 
@@ -511,7 +511,7 @@ func TestMapInMapEmpty(t *testing.T) {
 	
 	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf.Data[0], &s2)
+	container.unmarshal(buf, &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 
@@ -561,7 +561,7 @@ func TestMapInMap(t *testing.T) {
 	
 	buf, _ := container.marshal(&s1)
 
-	container.unmarshal(buf.Data[0], &s2)
+	container.unmarshal(buf, &s2)
 
 	fmt.Println("s1:", s1, ", s2:", s2)
 
