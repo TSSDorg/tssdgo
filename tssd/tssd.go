@@ -53,8 +53,8 @@ const (
 var ErrorInvalidTSSDVersion = errors.New("TSSD version invalid or too new to process")
 var ErrorInvalidTSSDData = errors.New("TSSD data invalid format error or damaged")
 var ErrorInSufficientData = errors.New("Need more data to process")
-var ErrorTSSDDataSchemaReject = errors.New("TSSD data schema not match")
-var ErrorTSSDDataUnregister = errors.New("TSSD data schema not found or not register")
+var ErrorTSSDDataSchemaUnmatch = errors.New("TSSD data schema not match or unregistered")
+var ErrorTSSDHeadOverSizeFragment = errors.New("TSSD Head large than fragment size limitation")
 
 var schemaTypeInfo *typeInfo
 
@@ -64,10 +64,12 @@ type Header struct {
 	Schema  Schema
 }
 
+// [Tobject][sizet/4bytes][sizea/2bytes][Tuint16][Fragments/2bytes][Tuint16][Current/2bytes][...]
 type Schema struct {
-	Hash    string
-	Type    string
-	Content string
+	Hash     string
+	TID      string
+	Fragment int16 //Fragment ID: [1,2,-3], < 0 means a ending fragment
+	Extent   string
 }
 
 func init() {
@@ -83,9 +85,21 @@ func (this *Schema) Unmarshal(buf *Buffer) error {
 }
 
 func appendHeader(buf *Buffer, schema Schema) error {
+	buf.schema = &schema
 	buf.Append([]byte(MAGIC))
 	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
-	return (&schema).Marshal(buf)
+	err := buf.schema.Marshal(buf)
+	if err != nil {
+		return err
+	}
+	buf.AppendByte(byte(Traw))
+	buf.appendSize4(0) //reserve sizet for raw data
+	//we will keep a copy of schema in buf.heads
+	if buf.Size >= cap(buf.Data[0]) { //TSSD Heads too large than the cap(fragment limitation)
+		return ErrorTSSDHeadOverSizeFragment
+	}
+	buf.heads = buf.Data[0][:buf.Size]
+	return nil
 }
 
 func isMagic(buf []byte) bool {
@@ -107,15 +121,28 @@ func dumpHeader(buf *Buffer) (*Header, error) {
 	}
 
 	copy(header.Version[:], bs[5:])
-	err = (&header.Schema).Unmarshal(buf)
+	if err = (&header.Schema).Unmarshal(buf); err != nil {
+		return nil, err
+	}
+
+	if b, err := buf.ReadByte(); err != nil || int8(b) != Traw {
+		return nil, ErrorInvalidTSSDData
+	}
+
+	if _, err := dumpSize4(buf); err != nil {
+		return nil, err
+	}
+
 	return header, err
 }
 
 type Buffer struct {
+	schema *Schema
+	heads  []byte
 	Cap    int
 	Size   int //total size
 	index  int //read index
-	pos    int
+	pos    int //read position
 	windex int //write index
 	Data   [][]byte
 }

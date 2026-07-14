@@ -3,6 +3,7 @@ package tssd
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"math/rand"
 )
 
 var groups = map[string]*factory{}
@@ -43,12 +44,8 @@ type Flatable interface {
 	//digest algo, default is the md5sum, you can override it
 	Hash([]byte) string
 
-	//return the raw type []byte, you can call but should not override it
-	//Types() []byte
-
 	//schema write in the TSSD header
-	//you can override it to add more infos such as a big json object string
-	//but you need override OnHeader too
+	//but you need override OnHeader to receive it
 	Schema() Schema
 
 	//when read/received a TSSD header, parse TSSD version and
@@ -56,10 +53,11 @@ type Flatable interface {
 	//return none-nil error will block factory to Unmarsh
 	OnHeader(header Header) (err error)
 
-	//return ver of the object, such as V1
-	Version() string
 	//return group of this class, suggest base class name, EG: Student
 	Group() string
+
+	//return ver of the object, such as V1
+	Version() string
 
 	//Progeny or Successor of current version
 	//which version it can upgrade to after Decorate
@@ -68,6 +66,12 @@ type Flatable interface {
 
 	//After Unmarshal, Decorate the object to support convert some info or migration/upgrate the object
 	Decorate(Flatable) Flatable
+
+	//id for current object, save into schema
+	TID() string
+
+	//extent info in schema
+	Extent() string
 }
 
 type constrainFlatable[T any] interface {
@@ -111,9 +115,29 @@ func (this *Flat[T, PT]) Hash(types []byte) string {
 func (this *Flat[T, PT]) Schema() Schema {
 	return Schema{
 		this.Hash(this.Types()),
-		"",
-		"",
+		this.TID(),
+		-1,
+		this.Extent(),
 	}
+}
+
+func (this *Flat[T, PT]) TID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 10)
+
+	_, err := rand.Read(b)
+	if err != nil {
+		return ""
+	}
+
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return string(b)
+}
+
+func (*Flat[T, PT]) Extent() string {
+	return ""
 }
 
 // we need user can override it
@@ -134,19 +158,19 @@ func MarshalTo(flat Flatable, buf *Buffer) error {
 	if factory, ok := groups[flat.Group()]; ok {
 		return factory.marshalTo(flat, buf)
 	}
-	return ErrorTSSDDataUnregister
+	return ErrorTSSDDataSchemaUnmatch
 }
 
 func UnmarshalTo(buf *Buffer, to Flatable) error {
 	if factory, ok := groups[to.Group()]; ok {
 		return factory.unmarshalTo(buf, to)
 	}
-	return ErrorTSSDDataUnregister
+	return ErrorTSSDDataSchemaUnmatch
 }
 
 func Unmarshal(buf *Buffer, group string) (to Flatable, err error) {
 	if factory, ok := groups[group]; ok {
 		return factory.unmarshal(buf)
 	}
-	return nil, ErrorTSSDDataUnregister
+	return nil, ErrorTSSDDataSchemaUnmatch
 }

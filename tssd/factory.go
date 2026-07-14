@@ -49,7 +49,7 @@ func (factory *factory) validate(header Header) error {
 		return ErrorInvalidTSSDVersion
 	}
 	if _, ok := factory.schemas[header.Schema.Hash]; !ok {
-		return ErrorTSSDDataSchemaReject
+		return ErrorTSSDDataSchemaUnmatch
 	}
 	return nil
 }
@@ -57,7 +57,7 @@ func (factory *factory) validate(header Header) error {
 func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
-		return ErrorTSSDDataSchemaReject
+		return ErrorTSSDDataSchemaUnmatch
 	}
 
 	appendHeader(buf, flat.Schema())
@@ -81,8 +81,8 @@ func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 	local := factory.versions[dest.Version()].hash
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
-		fmt.Printf("local schema: %s doesn't match with remote: schema[%s] hash[%s]\n", local, header.Schema, remoteHash)
-		return ErrorTSSDDataSchemaReject
+		fmt.Printf("remote schema hash[%s] not found(unregisted), local:[%s]\n", remoteHash, local)
+		return ErrorTSSDDataSchemaUnmatch
 	}
 
 	if local == remoteHash {
@@ -108,13 +108,13 @@ func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 		bi, ok := factory.versions[v]
 		if !ok {
 			fmt.Printf("local version %s not found\n", v)
-			return nil, ErrorTSSDDataSchemaReject
+			return nil, ErrorTSSDDataSchemaUnmatch
 		}
 		flat = bi.builder.Build().Decorate(flat)
 		v = flat.Progeny()
 	}
 	//your may specify unmarshal to a old one
-	return nil, ErrorTSSDDataSchemaReject
+	return nil, ErrorTSSDDataSchemaUnmatch
 }
 
 // Unmarshal we new a current version object for user
@@ -135,8 +135,8 @@ func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
-		fmt.Printf("remote schema [%s] hash[%s] not found\n", header.Schema, remoteHash)
-		return nil, ErrorTSSDDataSchemaReject
+		fmt.Printf("remote schema hash[%s] not found(unregisted)\n", remoteHash)
+		return nil, ErrorTSSDDataSchemaUnmatch
 	}
 	obj := bi.builder.Build()
 

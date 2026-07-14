@@ -214,7 +214,7 @@ func (info *typeInfo) print(buf Buffer) {
 // print your tssd []byte
 func (factory factory) print(version string, buf *Buffer) error {
 	if _, ok := factory.versions[version]; !ok {
-		return ErrorTSSDDataUnregister
+		return ErrorTSSDDataSchemaUnmatch
 	}
 
 	info := factory.versions[version].info
@@ -230,7 +230,7 @@ func (factory factory) print(version string, buf *Buffer) error {
 		Children: []*Node{
 			&Node{Content: fmt.Sprintf("Magic([5]byte):{%s}", string(header.Magic[:]))},
 			&Node{Content: fmt.Sprintf("Version[major.minor]:%d.%d", header.Version[1], header.Version[0])},
-			&Node{Content: fmt.Sprintf("Schema:{%s %s %s}", header.Schema.Hash, header.Schema.Type, header.Schema.Content)},
+			&Node{Content: fmt.Sprintf("Schema:{%s %s %d %s}", header.Schema.Hash, header.Schema.TID, header.Schema.Fragment, header.Schema.Extent)},
 		},
 	}
 
@@ -244,7 +244,7 @@ func (factory factory) print(version string, buf *Buffer) error {
 func Print(flat Flatable, buf Buffer) error {
 	factory, ok := groups[flat.Group()]
 	if !ok {
-		return ErrorTSSDDataUnregister
+		return ErrorTSSDDataSchemaUnmatch
 	}
 	return factory.print(flat.Version(), &buf)
 }
