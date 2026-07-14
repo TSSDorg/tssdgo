@@ -956,7 +956,7 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 	ti := parse(in)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	n := r.Intn(64)
+	n := r.Intn(128)
 
 	in = make([]AllBasicType, n)
 
@@ -966,7 +966,7 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 
 	fmt.Println("TestAllBasicTypeInStructSlice len:", len(in), " sizeof:", unsafe.Sizeof(in[0]))
 
-	buf := &Buffer{Cap : 8000*2}
+	buf := &Buffer{}
 	ti.marshalTo(Ptr(&in), buf)
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
