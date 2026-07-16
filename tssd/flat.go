@@ -1,8 +1,6 @@
 package tssd
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"math/rand"
 )
 
@@ -51,7 +49,7 @@ type Flatable interface {
 	//when read/received a TSSD header, parse TSSD version and
 	//parse schema and validate you received
 	//return none-nil error will block factory to Unmarsh
-	OnHeader(header Header) (err error)
+	//OnHeader(header Header) (err error)
 
 	//return group of this class, suggest base class name, EG: Student
 	Group() string
@@ -104,19 +102,14 @@ func (this *Flat[T, PT]) Types() []byte {
 }
 
 func (this *Flat[T, PT]) Hash(types []byte) string {
-	hasher := md5.New()
-	hasher.Write(types)                         // Write the data to the hasher
-	hashBytes := hasher.Sum(nil)                // Get the hash sum as a byte slice
-	hashString := hex.EncodeToString(hashBytes) // Convert to a hex string
-	l := len(hashString)
-	return hashString[:5] + hashString[l-5:l]
+	return string(hash(types))
 }
 
 func (this *Flat[T, PT]) Schema() Schema {
 	return Schema{
+		-1,
 		this.Hash(this.Types()),
 		this.TID(),
-		-1,
 		this.Extent(),
 	}
 }
@@ -138,11 +131,6 @@ func (this *Flat[T, PT]) TID() string {
 
 func (*Flat[T, PT]) Extent() string {
 	return ""
-}
-
-// we need user can override it
-func (this *Flat[T, PT]) OnHeader(header Header) error {
-	return nil
 }
 
 func (this *Flat[T, PT]) Decorate(flat Flatable) Flatable {

@@ -40,7 +40,12 @@ func Slice(k Ptr, size Size_t) []byte {
 }
 
 func appendSize2(dest []byte, le int) []byte {
-	l := uint16(le)
+	l := int16(le)
+	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
+}
+
+func appendSize4(dest []byte, le int) []byte {
+	l := int32(le)
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
 }
 
@@ -423,7 +428,7 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 }
 
 func (ti *typeInfo) marshal(src any) (*Buffer, error) {
-	buf := new(Buffer)
+	buf := &Buffer{}
 	err := ti.marshalTo(src, buf)
 	return buf, err
 }

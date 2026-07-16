@@ -223,14 +223,16 @@ func (factory factory) print(version string, buf *Buffer) error {
 		Content: "TSSD",
 	}
 
-	header, err := dumpHeader(buf)
-	fmt.Println("after dump header:", header, err, info)
+	//header, err := //dumpHeader(buf)
+	frag := &buf.Fragments[0]
+	header := frag.Header
+	fmt.Println("after dump header:", header, info)
 	headerNode := &Node{
 		Content: "header(header)",
 		Children: []*Node{
 			&Node{Content: fmt.Sprintf("Magic([5]byte):{%s}", string(header.Magic[:]))},
 			&Node{Content: fmt.Sprintf("Version[major.minor]:%d.%d", header.Version[1], header.Version[0])},
-			&Node{Content: fmt.Sprintf("Schema:{%s %s %d %s}", header.Schema.Hash, header.Schema.TID, header.Schema.Fragment, header.Schema.Extent)},
+			&Node{Content: fmt.Sprintf("Schema:{%s %s %d %s}", frag.Schema.Hash, frag.Schema.TID, frag.Schema.Fragment, frag.Schema.Extent)},
 		},
 	}
 

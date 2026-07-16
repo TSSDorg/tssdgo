@@ -1,21 +1,25 @@
 package tssd
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"unsafe"
+	//"unsafe"
 )
 
 const (
-	MAGIC              = "TSSDV"
-	TSSD_VERSION_MINOR = 1
-	TSSD_VERSION_MAJOR = 0
-	TSSD_FLAT_KIND     = "tssd.Flat"
-	TSSD_TIME_KIND     = "time.Time"
-	TSSD_TYPE_LENGTH   = 1
-	TSSD_SIZET_LENGTH  = 4
-	TSSD_SIZEA_LENGTH  = 2
-	TSSD_BUFFER_CAP    = 3072
+	MAGIC                = "TSSDV"
+	TSSD_VERSION_MINOR   = 1
+	TSSD_VERSION_MAJOR   = 0
+	TSSD_FLAT_KIND       = "tssd.Flat"
+	TSSD_TIME_KIND       = "time.Time"
+	TSSD_TYPE_LENGTH     = 1
+	TSSD_SIZET_LENGTH    = 4
+	TSSD_SIZEA_LENGTH    = 2
+	TSSD_BUFFER_CAP      = 3072
+	TSSD_HASH_HALF_SIZE  = 6 //actually size means *2
+	TSSD_CHECKSUM_LENGTH = TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH + TSSD_SIZET_LENGTH + TSSD_SIZEA_LENGTH + TSSD_HASH_HALF_SIZE + TSSD_HASH_HALF_SIZE
 )
 
 type Ttype int8
@@ -43,6 +47,7 @@ const (
 	Tdict           //map, pairs of (key, value)
 	Tdictk          //key of a map node
 	Tdictv          //value of a map node
+	Tdata           //TSSD data, it can be unmarshaled into Flatable object
 	Traw            //raw binary data
 	Tschema  = 77   //'M' schema meta data string
 	Theader  = 84   //'T' tssd header
@@ -55,21 +60,128 @@ var ErrorInvalidTSSDData = errors.New("TSSD data invalid format error or damaged
 var ErrorInSufficientData = errors.New("Need more data to process")
 var ErrorTSSDDataSchemaUnmatch = errors.New("TSSD data schema not match or unregistered")
 var ErrorTSSDHeadOverSizeFragment = errors.New("TSSD Head large than fragment size limitation")
+var ErrorTSSDDataChecksumFailure = errors.New("TSSD fragment data checksum failure")
+var ErrorTSSDDataFragmentIDUnmatch = errors.New("TSSD fragments TID unmatch")
 
 var schemaTypeInfo *typeInfo
 
 type Header struct {
 	Magic   [5]byte
 	Version [2]byte
-	Schema  Schema
 }
 
 // [Tobject][sizet/4bytes][sizea/2bytes][Tuint16][Fragments/2bytes][Tuint16][Current/2bytes][...]
 type Schema struct {
+	Fragment int16 //Fragment ID: [1,2,-3], < 0 means a ending fragment
 	Hash     string
 	TID      string
-	Fragment int16 //Fragment ID: [1,2,-3], < 0 means a ending fragment
 	Extent   string
+}
+
+type Patch struct {
+	Fragment int16 //Fragment ID
+	Off      int16 //position
+	Value    int64
+}
+
+type Fragment struct {
+	Header
+	Schema
+	Data []byte
+	//Patches  []Patch
+	//checksum format: [Tarraym][Tuint8][sizet/4B][sizea/2B][checksum/12B]
+	Checksum []byte //disgest of all the Fragment bytes
+}
+
+func hash(types []byte) []byte {
+	hasher := md5.New()
+	hasher.Write(types)                         // Write the data to the hasher
+	hashBytes := hasher.Sum(nil)                // Get the hash sum as a byte slice
+	hashString := hex.EncodeToString(hashBytes) // Convert to a hex string
+	l := len(hashString)
+	return []byte(hashString[:TSSD_HASH_HALF_SIZE] + hashString[l-TSSD_HASH_HALF_SIZE:l])
+}
+
+// we need unmarshal fragment manualy
+// @desc
+// input: data input raw data, make sure it begin with magic "TSSD"
+// return
+//
+//	[]byte: remain bytes after consume
+//	error:  ErrorInSufficientData means need more data to unmarshal
+//	        ErrorInvalidTSSDData is invalid data, you need drop all of them
+func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
+	if len(data) < 8 {
+		return data, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
+	}
+
+	if !isMagic(data) || data[7] != byte(Tschema) {
+		return data, fmt.Errorf("%w [magic header not 'TSSD' or schema %d invalid]", ErrorInvalidTSSDData, data[7])
+	}
+
+	buf := &Buffer{
+		Size: len(data),
+		Data: [][]byte{
+			data,
+		},
+	}
+
+	buf.Read(frag.Header.Magic[:])
+	buf.Read(frag.Header.Version[:])
+
+	//skip Tschema
+	if _, err := buf.ReadByte(); err != nil {
+		return data, ErrorInSufficientData
+	}
+
+	err := (&frag.Schema).Unmarshal(buf)
+	if err != nil {
+		return data, err
+	}
+	frag.Data, err = mergeByteSliceDump(buf)
+	if err != nil {
+		return data, err
+	}
+	//data before Checksum need hash to validate
+	needCheck := data[0:buf.Size]
+	frag.Checksum, err = mergeByteSliceDump(buf)
+	if err != nil {
+		return data, err
+	}
+
+	if err = frag.Validate(needCheck); err != nil {
+		return data, err
+	}
+
+	return buf.Data[0][buf.pos:], nil
+}
+
+func (frag *Fragment) Validate(input []byte) error {
+	if string(hash(input)) != string(frag.Checksum) {
+		return ErrorTSSDDataChecksumFailure
+	}
+	return nil
+}
+
+// [Tarraym][Tbyte][sizet][sizea][...]
+func mergeByteSliceDump(buf *Buffer) ([]byte, error) {
+	bs, err := buf.Read(make([]byte, 2))
+	if err != nil {
+		return nil, err
+	}
+	if string(bs) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
+		return nil, ErrorInvalidTSSDData
+	}
+
+	_, arrayN, err := checkDumpSize(buf)
+	if err != nil {
+		return nil, err
+	}
+	//we don't copy here, so manully updat buf
+	dest := buf.Data[buf.index][buf.pos : buf.pos+arrayN]
+	buf.Size -= arrayN
+	buf.pos += arrayN
+	return dest, nil
 }
 
 func init() {
@@ -84,185 +196,40 @@ func (this *Schema) Unmarshal(buf *Buffer) error {
 	return schemaTypeInfo.unmarshal(buf, this)
 }
 
+/*
 func appendHeader(buf *Buffer, schema Schema) error {
 	buf.schema = &schema
-	buf.Append([]byte(MAGIC))
-	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
-	err := buf.schema.Marshal(buf)
+	buf.heads :=  make([]byte, 0, TSSD_BUFFER_CAP)
+
+	//create a new buffer to receive
+	nbuf := &Buffer {
+		Data : [][]byte {
+			buf.heads,
+		},
+		FragmentData: [][] {
+			buf.heads,
+		},
+	}
+
+	nbuf.Append([]byte(MAGIC))
+	nbuf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
+
+	err := buf.schema.Marshal(nbuf)
 	if err != nil {
 		return err
 	}
-	buf.AppendByte(byte(Traw))
-	buf.appendSize4(0) //reserve sizet for raw data
+	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
+	//nbuf.appendSize4(0) //reserve sizet
+	//nbuf.appendSize2(0)
 	//we will keep a copy of schema in buf.heads
-	if buf.Size >= cap(buf.Data[0]) { //TSSD Heads too large than the cap(fragment limitation)
+	if nbuf.Size >= nbuf.maxAvail() { //TSSD Heads too large than the cap(fragment limitation)
 		return ErrorTSSDHeadOverSizeFragment
 	}
-	buf.heads = buf.Data[0][:buf.Size]
+	buf.heads = nbuf.Data[0][:nbuf.Pos]
 	return nil
 }
+*/
 
 func isMagic(buf []byte) bool {
 	return string(buf[:len(MAGIC)]) == MAGIC
-}
-
-// [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet][sizea=3][xxxxxxx]
-func dumpHeader(buf *Buffer) (*Header, error) {
-	bs, err := buf.Read(make([]byte, 8))
-	if err != nil {
-		return nil, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
-	}
-	if !isMagic(bs) || bs[7] != byte(Tschema) {
-		return nil, fmt.Errorf("%w [magic header not 'TSSD' or schema %d invalid]", ErrorInvalidTSSDData, bs[7])
-	}
-
-	header := &Header{
-		Magic: [5]byte{'T', 'S', 'S', 'D', 'V'},
-	}
-
-	copy(header.Version[:], bs[5:])
-	if err = (&header.Schema).Unmarshal(buf); err != nil {
-		return nil, err
-	}
-
-	if b, err := buf.ReadByte(); err != nil || int8(b) != Traw {
-		return nil, ErrorInvalidTSSDData
-	}
-
-	if _, err := dumpSize4(buf); err != nil {
-		return nil, err
-	}
-
-	return header, err
-}
-
-type Buffer struct {
-	schema *Schema
-	heads  []byte
-	Cap    int
-	Size   int //total size
-	index  int //read index
-	pos    int //read position
-	windex int //write index
-	Data   [][]byte
-}
-
-// reset buf's read info, let user read from begin
-func (buf *Buffer) Rewind() *Buffer {
-	buf.index, buf.pos, buf.Size = 0, 0, 0
-	for i := 0; i <= buf.windex; i++ {
-		buf.Size += len(buf.Data[i])
-	}
-	return buf
-}
-
-func (buf *Buffer) writePos() (int, int) {
-	idx := len(buf.Data) - 1
-	pos := len(buf.Data[idx])
-	if pos >= cap(buf.Data[idx]) {
-		pos = 0
-		idx++
-	}
-	return idx, pos
-}
-
-func (buf *Buffer) Append(bs []byte) *Buffer {
-	for len(bs) > 0 {
-		if buf.windex == len(buf.Data) {
-			if buf.Cap == 0 {
-				buf.Cap = TSSD_BUFFER_CAP
-			}
-			buf.Data = append(buf.Data, make([]byte, 0, buf.Cap))
-		}
-
-		if len(buf.Data[buf.windex])+len(bs) <= cap(buf.Data[buf.windex]) {
-			buf.Data[buf.windex] = append(buf.Data[buf.windex], bs...)
-			buf.Size += len(bs)
-			return buf
-		}
-
-		fill := cap(buf.Data[buf.windex]) - len(buf.Data[buf.windex])
-		buf.Data[buf.windex] = append(buf.Data[buf.windex], bs[:fill]...)
-		buf.Size += fill
-		bs = bs[fill:]
-		buf.windex++
-	}
-	//return self let us call in chain
-	return buf
-}
-
-func (buf *Buffer) AppendByte(b byte) *Buffer {
-	return buf.Append([]byte{b})
-}
-
-func (buf *Buffer) ReadByte() (b byte, err error) {
-	_, err = buf.Read(Slice(Ptr(&b), TSSD_TYPE_LENGTH))
-	return b, err
-}
-
-func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
-	if len(dest) == 0 {
-		return nil, nil
-	}
-	if buf.Size < len(dest) {
-		//should we return partial content ?
-		return nil, ErrorInSufficientData
-	}
-
-	result = dest
-	wanted := len(dest)
-	n := copy(dest[:wanted], buf.Data[buf.index][buf.pos:])
-	buf.Size -= n
-	buf.pos += n
-	if buf.pos >= buf.Cap {
-		buf.pos = 0
-		buf.index++
-	}
-	if n >= wanted {
-		return result, nil
-	}
-
-	dest = dest[n:]
-	for {
-		n = copy(dest, buf.Data[buf.index])
-		buf.Size -= n
-		dest = dest[n:]
-		if len(dest) == 0 {
-			break
-		}
-		buf.index++
-	}
-	buf.pos += n
-	if buf.pos >= buf.Cap {
-		buf.pos = 0
-		buf.index++
-	}
-	return result, nil
-}
-
-func (buf *Buffer) appendSize2(le int) *Buffer {
-	l := uint16(le)
-	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
-}
-
-func (buf *Buffer) appendSize4(le int) *Buffer {
-	l := uint32(le)
-	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
-}
-
-func (buf *Buffer) appendString(s string) *Buffer {
-	return buf.appendSize4(len(s)).Append([]byte(s))
-}
-
-func (buf *Buffer) updateSize(index, pos, value int) {
-	l := uint32(value)
-	s := Slice(Ptr(&l), unsafe.Sizeof(l))
-	for i := 0; i < len(s); i++ {
-		buf.Data[index][pos] = s[i]
-		pos++
-		if pos >= buf.Cap {
-			pos = 0
-			index++
-		}
-	}
 }

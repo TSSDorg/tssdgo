@@ -44,6 +44,7 @@ func (factory *factory) register(flat Flatable) {
 	factory.schemas[hash] = bi
 }
 
+/*
 func (factory *factory) validate(header Header) error {
 	if header.Version[1] != TSSD_VERSION_MAJOR || header.Version[0] != TSSD_VERSION_MINOR {
 		return ErrorInvalidTSSDVersion
@@ -52,7 +53,7 @@ func (factory *factory) validate(header Header) error {
 		return ErrorTSSDDataSchemaUnmatch
 	}
 	return nil
-}
+}*/
 
 func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	bi, ok := factory.versions[flat.Version()]
@@ -60,24 +61,19 @@ func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 		return ErrorTSSDDataSchemaUnmatch
 	}
 
-	appendHeader(buf, flat.Schema())
-	return bi.info.marshalTo(flat, buf)
+	buf.setSchema(flat.Schema())
+	err := bi.info.marshalTo(flat, buf)
+
+	buf.finish()
+	return err
 }
 
 // UnmarshalTo direct unmarshal to your object
 func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
-	header, err := dumpHeader(buf)
-	if err != nil {
-		return err
+	if len(buf.Fragments) == 0 {
+		return ErrorInSufficientData
 	}
-
-	if err := factory.validate(*header); err != nil {
-		return err
-	}
-	if err := dest.OnHeader(*header); err != nil {
-		return err
-	}
-	remoteHash := header.Schema.Hash
+	remoteHash := buf.Fragments[0].Schema.Hash
 	local := factory.versions[dest.Version()].hash
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
@@ -90,7 +86,7 @@ func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 	}
 
 	obj := bi.builder.Build()
-	err = bi.info.unmarshalTo(buf, obj)
+	err := bi.info.unmarshalTo(buf, obj)
 	if err != nil {
 		return err
 	}
@@ -119,19 +115,10 @@ func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 
 // Unmarshal we new a current version object for user
 func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
-	header, err := dumpHeader(buf)
-	if err != nil {
-		return nil, err
+	if len(buf.Fragments) == 0 {
+		return nil, ErrorInSufficientData
 	}
-
-	if err := factory.validate(*header); err != nil {
-		return nil, err
-	}
-
-	if err := factory.versions[factory.current].builder.OnHeader(*header); err != nil {
-		return nil, err
-	}
-	remoteHash := header.Schema.Hash
+	remoteHash := buf.Fragments[0].Schema.Hash
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
@@ -140,7 +127,7 @@ func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
 	}
 	obj := bi.builder.Build()
 
-	err = bi.info.unmarshalTo(buf, obj)
+	err := bi.info.unmarshalTo(buf, obj)
 	if err != nil {
 		return nil, err
 	}
