@@ -1,0 +1,282 @@
+package tssd
+
+import (
+	"unsafe"
+)
+
+type Buffer struct {
+	schema       *Schema
+	heads        []byte
+	Cap          int
+	Size         int        //total size
+	index        int        //read index
+	pos          int        //read position
+	windex       int        //write index
+	Data         [][]byte   //TSSD only
+	FragmentData [][]byte   //data with TSSD head/schema data with checksum, you can send/save diretly
+	Fragments    []Fragment //framents list received
+}
+
+func (buf *Buffer) setSchema(schema Schema) error {
+	if buf.Cap == 0 {
+		buf.Cap = TSSD_BUFFER_CAP
+	}
+	buf.schema = &schema
+	buf.heads = make([]byte, 0, buf.Cap)
+	//create a new buffer to receive
+	nbuf := &Buffer{
+		Data: [][]byte{
+			buf.heads,
+		},
+		FragmentData: [][]byte{
+			buf.heads,
+		},
+	}
+
+	nbuf.Append([]byte(MAGIC))
+	nbuf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
+
+	err := buf.schema.Marshal(nbuf)
+	if err != nil {
+		return err
+	}
+	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
+	avail := buf.Cap - buf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
+	nbuf.appendSize4(avail) //reserve sizet
+	nbuf.appendSize2(avail)
+	//we will keep a copy of schema in buf.heads
+	if nbuf.Size >= avail { //TSSD Heads too large than the cap(fragment limitation)
+		return ErrorTSSDHeadOverSizeFragment
+	}
+	buf.heads = nbuf.Data[0][:nbuf.Size]
+	return nil
+}
+
+// reset buf's read info, let user read from begin
+func (buf *Buffer) Rewind() *Buffer {
+	buf.index, buf.pos, buf.Size = 0, 0, 0
+	for i := 0; i <= buf.windex; i++ {
+		buf.Size += len(buf.Data[i])
+	}
+	return buf
+}
+
+func (buf *Buffer) writePos() (int, int) {
+	idx := len(buf.Data) - 1
+	pos := len(buf.Data[idx])
+	if pos >= cap(buf.Data[idx])-TSSD_CHECKSUM_LENGTH {
+		pos = 0
+		idx++
+	}
+	return idx, pos
+}
+
+func (buf *Buffer) finish() {
+	//we need update fragment id
+	last := len(buf.FragmentData)
+	buf.updateFragmentID(last-1, -last) //mark ending fragment
+
+	//update the real fragment data size for the last fragment
+	pos := len(buf.heads)
+	length := len(buf.Data[buf.windex])
+	appendSize4(buf.FragmentData[buf.windex][pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH:], length)
+	appendSize2(buf.FragmentData[buf.windex][pos-TSSD_SIZEA_LENGTH:], length)
+
+	//at last we need append checksum when finish(many sizet will update at finish)
+	for i := 0; i <= buf.windex; i++ {
+		buf.appendChecksum(i)
+	}
+}
+
+func (buf *Buffer) appendChecksum(index int) {
+	checksum := hash(buf.FragmentData[index])
+	//exclude all info about checksum
+	buf.FragmentData[index] = append(buf.FragmentData[index], byte(Tarraym))
+	buf.FragmentData[index] = append(buf.FragmentData[index], byte(Tuint8))
+	buf.FragmentData[index] = appendSize4(buf.FragmentData[index], len(checksum))
+	buf.FragmentData[index] = appendSize2(buf.FragmentData[index], len(checksum))
+	buf.FragmentData[index] = append(buf.FragmentData[index], checksum...)
+}
+
+func (buf *Buffer) copyAndUpdate(bs []byte) {
+	buf.Data[buf.windex] = append(buf.Data[buf.windex], bs...)
+	l := len(buf.FragmentData[buf.windex])
+	buf.FragmentData[buf.windex] = buf.FragmentData[buf.windex][:l+len(bs)]
+	buf.Size += len(bs)
+}
+
+func (buf *Buffer) Append(bs []byte) *Buffer {
+	for len(bs) > 0 {
+		if buf.windex == len(buf.Data) {
+			if buf.Cap == 0 {
+				buf.Cap = TSSD_BUFFER_CAP
+			}
+			buf.FragmentData = append(buf.FragmentData, make([]byte, 0, buf.Cap))
+			if len(buf.heads) > 0 {
+				buf.FragmentData[buf.windex] = append(buf.FragmentData[buf.windex], buf.heads...)
+				buf.updateFragmentID(buf.windex, buf.windex+1)
+			}
+			buf.Data = append(buf.Data, buf.FragmentData[buf.windex][len(buf.heads):])
+		}
+
+		if len(buf.Data[buf.windex])+len(bs) <= cap(buf.Data[buf.windex])-TSSD_CHECKSUM_LENGTH {
+			buf.copyAndUpdate(bs)
+			return buf
+		}
+
+		fill := cap(buf.Data[buf.windex]) - TSSD_CHECKSUM_LENGTH - len(buf.Data[buf.windex])
+		buf.copyAndUpdate(bs[:fill])
+		bs = bs[fill:]
+		buf.windex++
+	}
+	//return self let us call in chain
+	return buf
+}
+
+func (buf *Buffer) AppendByte(b byte) *Buffer {
+	return buf.Append([]byte{b})
+}
+
+func (buf *Buffer) ReadByte() (b byte, err error) {
+	_, err = buf.Read(Slice(Ptr(&b), TSSD_TYPE_LENGTH))
+	return b, err
+}
+
+func (buf *Buffer) Unread(n int) {
+	if buf.pos < n {
+		buf.index--
+		buf.pos += cap(buf.Data[buf.index])
+	}
+	buf.pos -= n
+}
+
+func (buf *Buffer) avail(index int) int {
+	return cap(buf.Data[buf.index]) - TSSD_CHECKSUM_LENGTH
+}
+
+func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
+	if len(dest) == 0 {
+		return nil, nil
+	}
+	if buf.Size < len(dest) {
+		//should we return partial content ?
+		return nil, ErrorInSufficientData
+	}
+
+	result = dest
+	wanted := len(dest)
+
+	n := copy(dest[:wanted], buf.Data[buf.index][buf.pos:buf.avail(buf.index)])
+	buf.Size -= n
+	buf.pos += n
+	if buf.pos >= buf.avail(buf.index) {
+		buf.pos = 0
+		buf.index++
+	}
+	if n >= wanted {
+		return result, nil
+	}
+
+	dest = dest[n:]
+	for {
+		n = copy(dest, buf.Data[buf.index][:buf.avail(buf.index)])
+		buf.Size -= n
+		dest = dest[n:]
+		if len(dest) == 0 {
+			break
+		}
+		buf.index++
+	}
+	buf.pos += n
+	if buf.pos >= buf.avail(buf.index) {
+		buf.pos = 0
+		buf.index++
+	}
+	return result, nil
+}
+
+func (buf *Buffer) appendSize2(le int) *Buffer {
+	l := uint16(le)
+	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
+}
+
+func (buf *Buffer) appendSize4(le int) *Buffer {
+	l := uint32(le)
+	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
+}
+
+func (buf *Buffer) appendString(s string) *Buffer {
+	return buf.appendSize4(len(s)).Append([]byte(s))
+}
+
+// [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet/4B][sizea/2B][FID][...]
+func (buf *Buffer) updateFragmentID(index, n int) {
+	if len(buf.FragmentData[index]) < 16 {
+		return
+	}
+	l := int16(n)
+	s := Slice(Ptr(&l), unsafe.Sizeof(l))
+	copy(buf.FragmentData[index][15:], s)
+}
+
+func (buf *Buffer) updateSize(index, pos, value int) {
+	l := uint32(value)
+	s := Slice(Ptr(&l), unsafe.Sizeof(l))
+	for i := 0; i < len(s); i++ {
+		buf.Data[index][pos] = s[i]
+		pos++
+		if pos >= buf.Cap {
+			pos = 0
+			index++
+		}
+	}
+}
+
+func (buf *Buffer) ready() {
+	buf.Data = make([][]byte, len(buf.Fragments))
+	buf.index, buf.pos, buf.Size = 0, 0, 0
+	for i := 0; i < len(buf.Fragments); i++ {
+		buf.Data[i] = buf.Fragments[i].Data
+		buf.Size += len(buf.Data[i])
+	}
+}
+
+// return fragment id with error if lost
+func (buf *Buffer) Push(frag *Fragment) (int, error) {
+	if buf.schema == nil {
+		buf.schema = &frag.Schema
+	} else {
+		if buf.schema.Hash != frag.Schema.Hash {
+			return 0, ErrorTSSDDataSchemaUnmatch
+		}
+		if buf.schema.TID != frag.Schema.TID {
+			return 0, ErrorTSSDDataFragmentIDUnmatch
+		}
+	}
+	fid := int(frag.Schema.Fragment) //fid: [1, 2, 3.. -n], the last < 0
+	if fid < 0 {
+		fid = -fid
+	}
+	if cap(buf.Fragments) < fid {
+		buf.Fragments = append(buf.Fragments, make([]Fragment, fid, max(fid, 32))...)
+	}
+
+	//we always copy it, even repeat push
+	buf.Fragments[fid-1] = *frag
+
+	//find if we miss one
+	for i := 0; i < cap(buf.Fragments); i++ {
+		switch {
+		case buf.Fragments[i].Schema.Fragment == 0:
+			return i + 1, ErrorInSufficientData
+		case buf.Fragments[i].Schema.Fragment < 0:
+			//we hit last one, reset the size
+			buf.Fragments = buf.Fragments[0 : i+1]
+			buf.ready()
+			return 0, nil
+		default:
+		}
+	}
+	//shouldn't reach here
+	return 0, nil
+}
