@@ -73,7 +73,7 @@ func (buf *Buffer) writePos() (int, int) {
 
 func (buf *Buffer) finish() {
 	//we need update fragment id
-	buf.updateFragmentID(buf.windex, -(buf.windex+1)) //mark ending fragment
+	buf.updateFragmentID(buf.windex, -(buf.windex + 1)) //mark ending fragment
 
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
@@ -242,15 +242,21 @@ func (buf *Buffer) ready() {
 }
 
 // return fragment id with error if lost
-func (buf *Buffer) Push(frag *Fragment) (int, error) {
+func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	if buf.schema == nil {
 		buf.schema = &frag.Schema
 	} else {
 		if buf.schema.Hash != frag.Schema.Hash {
-			return 0, ErrorTSSDDataSchemaUnmatch
+			err = ErrorTSSDDataSchemaUnmatch
 		}
 		if buf.schema.TID != frag.Schema.TID {
-			return 0, ErrorTSSDDataFragmentIDUnmatch
+			err = ErrorTSSDDataFragmentIDUnmatch
+		}
+		if err != nil {
+			if miss = buf.Wanted(); miss != 0 {
+				return miss, err
+			}
+			return 0, nil
 		}
 	}
 	fid := int(frag.Schema.Fragment) //fid: [1, 2, 3.. -n], the last < 0
@@ -264,19 +270,27 @@ func (buf *Buffer) Push(frag *Fragment) (int, error) {
 	//we always copy it, even repeat push
 	buf.Fragments[fid-1] = *frag
 
+	if miss = buf.Wanted(); miss != 0 {
+		return miss, ErrorInSufficientData
+	}
+	return 0, nil
+}
+
+// return the n-th Fragment that missing
+// return 0 if all fragments are present
+func (buf *Buffer) Wanted() int {
 	//find if we miss one
 	for i := 0; i < cap(buf.Fragments); i++ {
 		switch {
 		case buf.Fragments[i].Schema.Fragment == 0:
-			return i + 1, ErrorInSufficientData
+			return i + 1
 		case buf.Fragments[i].Schema.Fragment < 0:
 			//we hit last one, reset the size
 			buf.Fragments = buf.Fragments[0 : i+1]
 			buf.ready()
-			return 0, nil
+			return 0
 		default:
 		}
 	}
-	//shouldn't reach here
-	return 0, nil
+	return 0
 }
