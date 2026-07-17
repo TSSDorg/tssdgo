@@ -292,5 +292,5 @@ func (buf *Buffer) Wanted() int {
 		default:
 		}
 	}
-	return 0
+	return 1
 }
