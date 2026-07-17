@@ -1,7 +1,7 @@
 package tssd_test
 
 import (
-	"errors"
+	//"errors"
 	"fmt"
 	"strconv"
 	"testing"
@@ -55,24 +55,11 @@ func (this *worker_V2) TID() string {
 
 func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema{
+		-1,
 		this.Hash(this.Types()),
 		this.TID(),
-		-1,
 		"you can put a json object string",
 	}
-}
-
-func (this *worker_V2) OnHeader(header tssd.Header) (err error) {
-	//TSSD format version may update in future, do some check here
-	fmt.Printf("header version: %d.%d", header.Version[0], header.Version[1])
-
-	schema := header.Schema
-	//you can collect all fragments by the tid, fragments, current
-	fmt.Printf("tid: %s, fragment id: %d\n", schema.TID, schema.Fragment)
-
-	//and you can get the extend info in header.Schema which from peer
-	fmt.Printf("schema hash: [%s] extent content: %s\n", schema.Hash, schema.Extent)
-	return nil
 }
 
 ////////////////////////////the worker V1////////////////////////////////////
@@ -111,27 +98,28 @@ const (
 
 func (this *worker_V1) Schema() tssd.Schema {
 	return tssd.Schema{
+		-1,
 		this.Hash(this.Types()),
 		this.TID(),
-		-1,
 		SCHEMA_CONTENT,
 	}
 }
 
-func (this *worker_V1) OnHeader(header tssd.Header) (err error) {
-	//TSSD format version may update in future, do some check here
-	fmt.Printf("header version: %d.%d", header.Version[0], header.Version[1])
+//
+func pipe(sender *tssd.Buffer) (receiver *tssd.Buffer) {
+	receiver = &tssd.Buffer{}
 
-	schema := header.Schema
-	//you can collect all fragments by the tid, fragments, current
-	fmt.Printf("tid: %s, fragment id: %d\n", schema.TID, schema.Fragment)
-
-	//and you can get the extend info in header.Schema which from peer
-	fmt.Printf("schema hash: [%s] extent content: %s\n", schema.Hash, schema.Extent)
-	if header.Schema.Extent != SCHEMA_CONTENT {
-		return errors.New("TSSD schema extent info err")
+	//TSSD produce in the sender.FragmentData
+	for i:=0; i<len(sender.FragmentData); i++ {
+		frag := &tssd.Fragment{}
+		_, err := frag.Unmarshal(sender.FragmentData[i])
+		if err != nil {
+			fmt.Println("data:", sender.FragmentData[i])
+			panic("pipe output unmashal fail")
+		}
+		receiver.Push(frag)
 	}
-	return nil
+	return receiver
 }
 
 //test V1->V2
@@ -151,8 +139,9 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	fmt.Println("st buf: ", buf)
 
 	var s1 worker_V1
+	buf2 := pipe(buf)
 	//buf input by v1, you can receive v1
-	err := tssd.UnmarshalTo(buf, &s1)
+	err := tssd.UnmarshalTo(buf2, &s1)
 	if err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
@@ -162,7 +151,7 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	var s2 worker_V2
 	tssd.Register(&worker_V2{})
 	//buf input by v1, you can receive v2
-	err = tssd.UnmarshalTo(buf.Rewind(), &s2)
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s2)
 	if err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
@@ -185,15 +174,16 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 	buf, _ := tssd.Marshal(&st)
 
 	var s1 worker_V1
+	buf2 := pipe(buf)
 	//buf input by v2, you can't downgrade to v1
-	err := tssd.UnmarshalTo(buf, &s1)
+	err := tssd.UnmarshalTo(buf2, &s1)
 	if err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 worker_V2
 	//buf input by v1, you can receive v2
-	err = tssd.UnmarshalTo(buf.Rewind(), &s2)
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s2)
 	if err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")

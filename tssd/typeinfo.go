@@ -50,13 +50,13 @@ func appendSize4(dest []byte, le int) []byte {
 }
 
 func dumpSize2(buf *Buffer) (int, error) {
-	var size uint16
+	var size int16
 	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZEA_LENGTH))
 	return int(size), err
 }
 
 func dumpSize4(buf *Buffer) (int, error) {
-	var size uint32
+	var size int32
 	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZET_LENGTH))
 	return int(size), err
 }

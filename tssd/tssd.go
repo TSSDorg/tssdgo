@@ -143,7 +143,7 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 		return data, err
 	}
 	//data before Checksum need hash to validate
-	needCheck := data[0:buf.Size]
+	needCheck := data[0:buf.pos]
 	frag.Checksum, err = mergeByteSliceDump(buf)
 	if err != nil {
 		return data, err
