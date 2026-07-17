@@ -196,40 +196,6 @@ func (this *Schema) Unmarshal(buf *Buffer) error {
 	return schemaTypeInfo.unmarshal(buf, this)
 }
 
-/*
-func appendHeader(buf *Buffer, schema Schema) error {
-	buf.schema = &schema
-	buf.heads :=  make([]byte, 0, TSSD_BUFFER_CAP)
-
-	//create a new buffer to receive
-	nbuf := &Buffer {
-		Data : [][]byte {
-			buf.heads,
-		},
-		FragmentData: [][] {
-			buf.heads,
-		},
-	}
-
-	nbuf.Append([]byte(MAGIC))
-	nbuf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
-
-	err := buf.schema.Marshal(nbuf)
-	if err != nil {
-		return err
-	}
-	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
-	//nbuf.appendSize4(0) //reserve sizet
-	//nbuf.appendSize2(0)
-	//we will keep a copy of schema in buf.heads
-	if nbuf.Size >= nbuf.maxAvail() { //TSSD Heads too large than the cap(fragment limitation)
-		return ErrorTSSDHeadOverSizeFragment
-	}
-	buf.heads = nbuf.Data[0][:nbuf.Pos]
-	return nil
-}
-*/
-
 func isMagic(buf []byte) bool {
 	return string(buf[:len(MAGIC)]) == MAGIC
 }
