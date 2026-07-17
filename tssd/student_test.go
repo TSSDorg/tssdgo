@@ -10,10 +10,6 @@ import (
 //this file test for a complex object Student
 
 
-type Equaler interface {
-	Equal(Equaler) bool
-}
-
 type Course struct {
 	Name string
 	TestTime time.Time
@@ -31,7 +27,7 @@ type School struct {
 }
 
 func (this *School)Equal(other *School) bool {
-	return this.Name == other.Name && SliceEqual(this.Camp, other.Camp) && 
+	return this.Name == other.Name && tssd.SliceEqual(this.Camp, other.Camp) && 
 	this.EntryLeaveTime[0].Equal(other.EntryLeaveTime[0]) && this.EntryLeaveTime[1].Equal(other.EntryLeaveTime[1]) 
 }
 
@@ -60,41 +56,6 @@ func (this *Student) Group() string {
 	return STUDENT_GROUP
 }
 
-func SliceEqual[T comparable](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func SliceEqual2[T Equaler](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i].Equal(b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k,v := range a {
-		if !v.Equal(b[k]){
-			return false
-		}
-	}
-	return true
-}
 
 func (this *Student) Equal(other *Student) bool {
 	ret := this.ID == other.ID && this.Age == other.Age && this.Value == other.Value && this.IsMale == other.IsMale && this.Birth.Equal(other.Birth) && this.Mail == other.Mail
@@ -103,11 +64,11 @@ func (this *Student) Equal(other *Student) bool {
 		return false
 	}
 
-	if !SliceEqual(this.Levels, other.Levels) {
+	if !tssd.SliceEqual(this.Levels, other.Levels) {
 		return false
 	}
 
-	if !SliceEqual(this.Address[:], other.Address[:]) {
+	if !tssd.SliceEqual(this.Address[:], other.Address[:]) {
 		return false
 	}
 	fmt.Println("student Equal 1")
@@ -168,10 +129,10 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	tssd.Print(&v, *n)
+	//tssd.Print(&v, *n)
 
 	var v2 Student
-	tssd.UnmarshalTo(n, &v2)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
 	fmt.Println("-----v:", v)
 	fmt.Println("-----v2:", v2)
 	if !v.Equal(&v2) {
@@ -186,7 +147,7 @@ func TestStudent(t *testing.T) {
 
 	var v3 Student
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v3)
 	if !v3.Equal(&v) {
 		t.Error("TestStruct student failed")
 	}
@@ -198,7 +159,7 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v3)
 	if !v3.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
@@ -242,7 +203,7 @@ func TestPrintMap(t *testing.T) {
 
 	var sout student
 	
-	tssd.UnmarshalTo(n, &sout)
+	tssd.UnmarshalTo(tssd.Pipe(n), &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)
 }

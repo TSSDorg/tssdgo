@@ -106,21 +106,6 @@ func (this *worker_V1) Schema() tssd.Schema {
 }
 
 //
-func pipe(sender *tssd.Buffer) (receiver *tssd.Buffer) {
-	receiver = &tssd.Buffer{}
-
-	//TSSD produce in the sender.FragmentData
-	for i:=0; i<len(sender.FragmentData); i++ {
-		frag := &tssd.Fragment{}
-		_, err := frag.Unmarshal(sender.FragmentData[i])
-		if err != nil {
-			fmt.Println("data:", sender.FragmentData[i])
-			panic("pipe output unmashal fail")
-		}
-		receiver.Push(frag)
-	}
-	return receiver
-}
 
 //test V1->V2
 func TestUnmarshalDecorateWorker(t *testing.T) {
@@ -139,7 +124,7 @@ func TestUnmarshalDecorateWorker(t *testing.T) {
 	fmt.Println("st buf: ", buf)
 
 	var s1 worker_V1
-	buf2 := pipe(buf)
+	buf2 := tssd.Pipe(buf)
 	//buf input by v1, you can receive v1
 	err := tssd.UnmarshalTo(buf2, &s1)
 	if err != nil || s1.Name != name || s1.Age != age {
@@ -174,7 +159,7 @@ func TestUnmarshalDecorateWorker2(t *testing.T) {
 	buf, _ := tssd.Marshal(&st)
 
 	var s1 worker_V1
-	buf2 := pipe(buf)
+	buf2 := tssd.Pipe(buf)
 	//buf input by v2, you can't downgrade to v1
 	err := tssd.UnmarshalTo(buf2, &s1)
 	if err == nil {

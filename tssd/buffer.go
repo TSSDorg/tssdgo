@@ -141,6 +141,15 @@ func (buf *Buffer) ReadByte() (b byte, err error) {
 	return b, err
 }
 
+func (buf *Buffer) Unread(n int) {
+	if buf.pos < n {
+		buf.index--
+		buf.pos += buf.avail(buf.index)
+	}
+	buf.pos -= n
+	buf.Size += n
+}
+
 func (buf *Buffer) avail(index int) int {
 	return cap(buf.Data[buf.index]) - TSSD_CHECKSUM_LENGTH
 }

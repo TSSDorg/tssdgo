@@ -29,6 +29,7 @@ func (node *Node) print() {
 
 func dprintf[T comparable](info *typeInfo, format string, buf *Buffer) (string, error) {
 	var d T
+	buf.Unread(1)
 	err := info.dump(info, buf, Ptr(&d))
 	return fmt.Sprintf(format, info.name, info.rtype.String(), d), err
 }
@@ -106,16 +107,10 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 	case Tstring:
 		node.Content, err = dprintf[string](info, "%s(%s): %s", buf)
 	case Ttime:
-
-		var rfc3339Str string
-		err := info.strDump(buf, Ptr(&rfc3339Str))
+		buf.Unread(1)
+		var t time.Time
+		err := info.timeDump(buf, Ptr(&t))
 		if err != nil {
-			return err
-		}
-
-		t, err := time.Parse(time.RFC3339Nano, rfc3339Str)
-		if err != nil {
-			fmt.Println("parse time err:", err)
 			return err
 		}
 		node.Content = fmt.Sprintf("%s(%s): %s", info.name, info.rtype.String(), t.Format(time.RFC3339Nano))
@@ -223,10 +218,14 @@ func (factory factory) print(version string, buf *Buffer) error {
 		Content: "TSSD",
 	}
 
+	if len(buf.Fragments) == 0 {
+		buf = Pipe(buf)
+	}
+
 	//header, err := //dumpHeader(buf)
 	frag := &buf.Fragments[0]
 	header := frag.Header
-	fmt.Println("after dump header:", header, info)
+	fmt.Println("header:", header, info)
 	headerNode := &Node{
 		Content: "header(header)",
 		Children: []*Node{

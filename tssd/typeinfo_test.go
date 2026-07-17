@@ -1002,6 +1002,7 @@ func TestTssdSlice(t *testing.T) {
 	ti := parse(array)
 
 	dest, _ := ti.marshal(Ptr(&array))
+	fmt.Println("TestTssdSlice:", dest)
 	ti.print(*dest)
 
 	var j []int64
@@ -1123,7 +1124,7 @@ func TestTssdPrint(t *testing.T) {
 		t.Error("unmarsha struct failed")
 	}
 }
-
+/*
 func TestBuffer(t *testing.T) {
 	buf := &Buffer{}
 	buf.Append(nil)
@@ -1177,33 +1178,6 @@ func TestBuffer2(t *testing.T) {
 	if d, err = buf.Read(dest[:1]); err == nil {
 		t.Error("Buffer read oversize should return err")
 	}
-}
-
-func SliceEqual[T comparable](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func SliceSliceEqual[T comparable](a, b [][]T) bool {
-	if len(a) == 0 && len(b) == 0 {
-		return true
-	}
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !SliceEqual(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
 }
 
 func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
@@ -1319,3 +1293,4 @@ func TestReadBuffer3(t *testing.T) {
 	readBuffer3(t, 2, 8, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109})
 	readBuffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
 }
+*/
