@@ -12,7 +12,6 @@ type Buffer struct {
 	index     int        //read index
 	pos       int        //read position
 	windex    int        //write index
-	Data      [][]byte   //TSSD only
 	Fragments []Fragment //framents list sending/received
 }
 
@@ -26,11 +25,11 @@ func (buf *Buffer) setSchema(schema Schema) error {
 	//create a new buffer to receive
 	nbuf := &Buffer{
 		MTU: buf.MTU,
-		Data: [][]byte{
-			buf.heads,
-		},
 		Fragments: []Fragment{
-			Fragment{Raw: buf.heads},
+			Fragment{
+				Data: buf.heads,
+				Raw:  buf.heads,
+			},
 		},
 	}
 
@@ -49,7 +48,7 @@ func (buf *Buffer) setSchema(schema Schema) error {
 	if nbuf.Size >= avail { //TSSD Heads too large than the MTU(fragment limitation)
 		return ErrorTSSDHeadOverSizeFragment
 	}
-	buf.heads = nbuf.Data[0][:nbuf.Size]
+	buf.heads = nbuf.Fragments[0].Data[:nbuf.Size]
 	return nil
 }
 
@@ -57,14 +56,14 @@ func (buf *Buffer) setSchema(schema Schema) error {
 func (buf *Buffer) Rewind() *Buffer {
 	buf.index, buf.pos, buf.Size = 0, 0, 0
 	for i := 0; i <= buf.windex; i++ {
-		buf.Size += len(buf.Data[i])
+		buf.Size += len(buf.Fragments[i].Data)
 	}
 	return buf
 }
 
 func (buf *Buffer) writePos() (int, int) {
-	idx := len(buf.Data) - 1
-	pos := len(buf.Data[idx])
+	idx := len(buf.Fragments) - 1
+	pos := len(buf.Fragments[idx].Data)
 	if pos >= buf.avail(idx) {
 		pos = 0
 		idx++
@@ -78,7 +77,7 @@ func (buf *Buffer) finish() {
 
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
-	length := len(buf.Data[buf.windex])
+	length := len(buf.Fragments[buf.windex].Data)
 	appendSize4(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
 	appendSize2(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZEA_LENGTH], length)
 
@@ -99,7 +98,7 @@ func (buf *Buffer) appendChecksum(index int) {
 }
 
 func (buf *Buffer) copyAndUpdate(bs []byte) {
-	buf.Data[buf.windex] = append(buf.Data[buf.windex], bs...)
+	buf.Fragments[buf.windex].Data = append(buf.Fragments[buf.windex].Data, bs...)
 	l := len(buf.Fragments[buf.windex].Raw)
 	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[:l+len(bs)]
 	buf.Size += len(bs)
@@ -107,7 +106,7 @@ func (buf *Buffer) copyAndUpdate(bs []byte) {
 
 func (buf *Buffer) Append(bs []byte) *Buffer {
 	for len(bs) > 0 {
-		if buf.windex == len(buf.Data) {
+		if buf.windex == len(buf.Fragments) {
 			if buf.MTU == 0 {
 				buf.MTU = TSSD_BUFFER_MTU
 			}
@@ -123,15 +122,14 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 				buf.Fragments[buf.windex].Schema = *buf.schema
 			}
 			buf.updateFragmentID(buf.windex, buf.windex+1)
-			buf.Data = append(buf.Data, buf.Fragments[buf.windex].Data)
 		}
 
-		if len(buf.Data[buf.windex])+len(bs) <= buf.avail(buf.windex) {
+		if len(buf.Fragments[buf.windex].Data)+len(bs) <= buf.avail(buf.windex) {
 			buf.copyAndUpdate(bs)
 			return buf
 		}
 
-		fill := buf.avail(buf.windex) - len(buf.Data[buf.windex])
+		fill := buf.avail(buf.windex) - len(buf.Fragments[buf.windex].Data)
 		buf.copyAndUpdate(bs[:fill])
 		bs = bs[fill:]
 		buf.windex++
@@ -159,7 +157,7 @@ func (buf *Buffer) Unread(n int) {
 }
 
 func (buf *Buffer) avail(index int) int {
-	return cap(buf.Data[buf.index]) - TSSD_CHECKSUM_LENGTH
+	return cap(buf.Fragments[buf.index].Data) - TSSD_CHECKSUM_LENGTH
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -174,7 +172,7 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 	result = dest
 	wanted := len(dest)
 
-	n := copy(dest[:wanted], buf.Data[buf.index][buf.pos:buf.avail(buf.index)])
+	n := copy(dest[:wanted], buf.Fragments[buf.index].Data[buf.pos:buf.avail(buf.index)])
 	buf.Size -= n
 	buf.pos += n
 	if buf.pos >= buf.avail(buf.index) {
@@ -187,7 +185,7 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 
 	dest = dest[n:]
 	for {
-		n = copy(dest, buf.Data[buf.index][:buf.avail(buf.index)])
+		n = copy(dest, buf.Fragments[buf.index].Data[:buf.avail(buf.index)])
 		buf.Size -= n
 		dest = dest[n:]
 		if len(dest) == 0 {
@@ -231,21 +229,12 @@ func (buf *Buffer) updateSize(index, pos, value int) {
 	l := int32(value)
 	s := Slice(Ptr(&l), unsafe.Sizeof(l))
 	for i := 0; i < len(s); i++ {
-		buf.Data[index][pos] = s[i]
+		buf.Fragments[index].Data[pos] = s[i]
 		pos++
 		if pos >= buf.avail(index) {
 			pos = 0
 			index++
 		}
-	}
-}
-
-func (buf *Buffer) ready() {
-	buf.Data = make([][]byte, len(buf.Fragments))
-	buf.index, buf.pos, buf.Size = 0, 0, 0
-	for i := 0; i < len(buf.Fragments); i++ {
-		buf.Data[i] = buf.Fragments[i].Data
-		buf.Size += len(buf.Data[i])
 	}
 }
 
@@ -275,8 +264,13 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 		buf.Fragments = append(buf.Fragments, make([]Fragment, fid, max(fid, 32))...)
 	}
 
+	if buf.Fragments[fid-1].Schema.Fragment != 0 {
+		buf.Size -= len(buf.Fragments[fid-1].Data)
+	}
+
 	//we always copy it, even repeat push
 	buf.Fragments[fid-1] = *frag
+	buf.Size += len(buf.Fragments[fid-1].Data)
 
 	if miss = buf.Wanted(); miss != 0 {
 		return miss, ErrorInSufficientData
@@ -295,7 +289,6 @@ func (buf *Buffer) Wanted() int {
 		case buf.Fragments[i].Schema.Fragment < 0:
 			//we hit last one, reset the size
 			buf.Fragments = buf.Fragments[0 : i+1]
-			buf.ready()
 			return 0
 		default:
 		}

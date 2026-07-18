@@ -123,13 +123,18 @@ func TestStudent(t *testing.T) {
 
 	tssd.Register(&v)
 
-	n, _ := tssd.Marshal(&v)
+	n := &tssd.Buffer {
+		MTU: 100,
+	}
 
-	if len(n.Data[0]) == 0 {
+	tssd.MarshalTo(&v, n)
+
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	//tssd.Print(&v, *n)
+	tssd.Print(&v, *n)
+	fmt.Println("fragments:", len(n.Fragments))
 
 	var v2 Student
 	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
@@ -141,7 +146,7 @@ func TestStudent(t *testing.T) {
 
 	
 	n, _ = tssd.Marshal(&v2)
-	if len(n.Data[0]) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
@@ -155,7 +160,7 @@ func TestStudent(t *testing.T) {
 	v2.Address = v2.Address[:0]
 
 	n, _ = tssd.Marshal(&v2)
-	if len(n.Data[0]) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
@@ -190,7 +195,7 @@ func TestPrintMap(t *testing.T) {
 
 	n, _ := tssd.Marshal(&s1)
 
-	if len(n.Data[0]) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 

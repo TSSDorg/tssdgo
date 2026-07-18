@@ -123,8 +123,11 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 
 	buf := &Buffer{
 		Size: len(data),
-		Data: [][]byte{
-			data,
+		Fragments: []Fragment{
+			Fragment{
+				Data: data,
+				Raw:  data,
+			},
 		},
 	}
 
