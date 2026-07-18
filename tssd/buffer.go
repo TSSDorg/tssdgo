@@ -20,6 +20,7 @@ func (buf *Buffer) setSchema(schema Schema) error {
 	if buf.MTU == 0 {
 		buf.MTU = TSSD_BUFFER_MTU
 	}
+	buf.MTU = max(buf.MTU, TSSD_BUFFER_MIN_MTU)
 	buf.schema = &schema
 	buf.heads = make([]byte, 0, buf.MTU/3)
 	//create a new buffer to receive
