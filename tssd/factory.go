@@ -44,26 +44,13 @@ func (factory *factory) register(flat Flatable) {
 	factory.schemas[hash] = bi
 }
 
-/*
-func (factory *factory) validate(header Header) error {
-	if header.Version[1] != TSSD_VERSION_MAJOR || header.Version[0] != TSSD_VERSION_MINOR {
-		return ErrorInvalidTSSDVersion
-	}
-	if _, ok := factory.schemas[header.Schema.Hash]; !ok {
-		return ErrorTSSDDataSchemaUnmatch
-	}
-	return nil
-}*/
-
 func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	bi, ok := factory.versions[flat.Version()]
 	if !ok {
 		return ErrorTSSDDataSchemaUnmatch
 	}
-
-	buf.setSchema(flat.Schema())
+	buf.begin(flat.Schema())
 	err := bi.info.marshalTo(flat, buf)
-
 	buf.finish()
 	return err
 }
@@ -138,6 +125,5 @@ func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
 	}
 
 	to := factory.versions[factory.current].builder.Build()
-
 	return factory.decorate(obj, to)
 }
