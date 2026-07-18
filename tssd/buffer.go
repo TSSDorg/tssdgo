@@ -5,16 +5,15 @@ import (
 )
 
 type Buffer struct {
-	schema       *Schema
-	heads        []byte
-	MTU          int
-	Size         int        //total size
-	index        int        //read index
-	pos          int        //read position
-	windex       int        //write index
-	Data         [][]byte   //TSSD only
-	FragmentData [][]byte   //data with TSSD head/schema data with checksum, you can send/save diretly
-	Fragments    []Fragment //framents list received
+	schema    *Schema
+	heads     []byte
+	MTU       int
+	Size      int        //total size
+	index     int        //read index
+	pos       int        //read position
+	windex    int        //write index
+	Data      [][]byte   //TSSD only
+	Fragments []Fragment //framents list sending/received
 }
 
 func (buf *Buffer) setSchema(schema Schema) error {
@@ -28,8 +27,8 @@ func (buf *Buffer) setSchema(schema Schema) error {
 		Data: [][]byte{
 			buf.heads,
 		},
-		FragmentData: [][]byte{
-			buf.heads,
+		Fragments: []Fragment{
+			Fragment{Raw: buf.heads},
 		},
 	}
 
@@ -78,8 +77,8 @@ func (buf *Buffer) finish() {
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
 	length := len(buf.Data[buf.windex])
-	appendSize4(buf.FragmentData[buf.windex][:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
-	appendSize2(buf.FragmentData[buf.windex][:pos-TSSD_SIZEA_LENGTH], length)
+	appendSize4(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
+	appendSize2(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZEA_LENGTH], length)
 
 	//at last we need append checksum when finish(many sizet will update at finish)
 	for i := 0; i <= buf.windex; i++ {
@@ -88,19 +87,19 @@ func (buf *Buffer) finish() {
 }
 
 func (buf *Buffer) appendChecksum(index int) {
-	checksum := hash(buf.FragmentData[index])
+	checksum := hash(buf.Fragments[index].Raw)
 	//exclude all info about checksum
-	buf.FragmentData[index] = append(buf.FragmentData[index], byte(Tarraym))
-	buf.FragmentData[index] = append(buf.FragmentData[index], byte(Tuint8))
-	buf.FragmentData[index] = appendSize4(buf.FragmentData[index], len(checksum))
-	buf.FragmentData[index] = appendSize2(buf.FragmentData[index], len(checksum))
-	buf.FragmentData[index] = append(buf.FragmentData[index], checksum...)
+	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tarraym))
+	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tuint8))
+	buf.Fragments[index].Raw = appendSize4(buf.Fragments[index].Raw, len(checksum))
+	buf.Fragments[index].Raw = appendSize2(buf.Fragments[index].Raw, len(checksum))
+	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, checksum...)
 }
 
 func (buf *Buffer) copyAndUpdate(bs []byte) {
 	buf.Data[buf.windex] = append(buf.Data[buf.windex], bs...)
-	l := len(buf.FragmentData[buf.windex])
-	buf.FragmentData[buf.windex] = buf.FragmentData[buf.windex][:l+len(bs)]
+	l := len(buf.Fragments[buf.windex].Raw)
+	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[:l+len(bs)]
 	buf.Size += len(bs)
 }
 
@@ -110,12 +109,19 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			if buf.MTU == 0 {
 				buf.MTU = TSSD_BUFFER_MTU
 			}
-			buf.FragmentData = append(buf.FragmentData, make([]byte, 0, buf.MTU))
-			if len(buf.heads) > 0 {
-				buf.FragmentData[buf.windex] = append(buf.FragmentData[buf.windex], buf.heads...)
-				buf.updateFragmentID(buf.windex, buf.windex+1)
+			b := make([]byte, len(buf.heads), buf.MTU)
+			copy(b, buf.heads)
+
+			buf.Fragments = append(buf.Fragments,
+				Fragment{
+					Data: b[len(buf.heads):],
+					Raw:  b,
+				})
+			if buf.schema != nil {
+				buf.Fragments[buf.windex].Schema = *buf.schema
 			}
-			buf.Data = append(buf.Data, buf.FragmentData[buf.windex][len(buf.heads):])
+			buf.updateFragmentID(buf.windex, buf.windex+1)
+			buf.Data = append(buf.Data, buf.Fragments[buf.windex].Data)
 		}
 
 		if len(buf.Data[buf.windex])+len(bs) <= buf.avail(buf.windex) {
@@ -211,12 +217,12 @@ func (buf *Buffer) appendString(s string) *Buffer {
 
 // [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet/4B][sizea/2B][FID][...]
 func (buf *Buffer) updateFragmentID(index, n int) {
-	if len(buf.FragmentData[index]) < 17 {
+	if len(buf.Fragments[index].Raw) < 17 {
 		return
 	}
 	l := int16(n)
 	s := Slice(Ptr(&l), unsafe.Sizeof(l))
-	copy(buf.FragmentData[index][16:], s)
+	copy(buf.Fragments[index].Raw[16:], s)
 }
 
 func (buf *Buffer) updateSize(index, pos, value int) {

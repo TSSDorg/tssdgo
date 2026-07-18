@@ -87,10 +87,11 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
-	Data []byte
+	Data []byte //TSSD content only
 	//Patches  []Patch
 	//checksum format: [Tarraym][Tuint8][sizet/4B][sizea/2B][checksum/12B]
 	Checksum []byte //disgest of all the Fragment bytes
+	Raw      []byte //raw data including fragment header, TSSD content, Checksum
 }
 
 func hash(types []byte) []byte {
@@ -138,13 +139,16 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err != nil {
 		return data, err
 	}
-	frag.Data, err = mergeByteSliceDump(buf)
+
+	var posData, posChecksum int
+
+	posData, frag.Data, err = mergeByteSliceDump(buf)
 	if err != nil {
 		return data, err
 	}
 	//data before Checksum need hash to validate
 	needCheck := data[0:buf.pos]
-	frag.Checksum, err = mergeByteSliceDump(buf)
+	posChecksum, frag.Checksum, err = mergeByteSliceDump(buf)
 	if err != nil {
 		return data, err
 	}
@@ -152,6 +156,11 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err = frag.Validate(needCheck); err != nil {
 		return data, err
 	}
+
+	frag.Raw = make([]byte, buf.pos)
+	copy(frag.Raw, data)
+	frag.Data = frag.Raw[posData : posData+len(frag.Data)]
+	frag.Checksum = frag.Raw[posChecksum : posChecksum+len(frag.Checksum)]
 
 	return buf.Data[0][buf.pos:], nil
 }
@@ -164,24 +173,24 @@ func (frag *Fragment) Validate(input []byte) error {
 }
 
 // [Tarraym][Tbyte][sizet][sizea][...]
-func mergeByteSliceDump(buf *Buffer) ([]byte, error) {
+func mergeByteSliceDump(buf *Buffer) (int, []byte, error) {
 	bs, err := buf.Read(make([]byte, 2))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if string(bs) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
-		return nil, ErrorInvalidTSSDData
+		return 0, nil, ErrorInvalidTSSDData
 	}
 
 	_, arrayN, err := checkDumpSize(buf)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	//we don't copy here, so manully updat buf
 	dest := buf.Data[buf.index][buf.pos : buf.pos+arrayN]
 	buf.Size -= arrayN
 	buf.pos += arrayN
-	return dest, nil
+	return buf.pos, dest, nil
 }
 
 func init() {
