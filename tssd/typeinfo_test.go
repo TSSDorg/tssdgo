@@ -1138,17 +1138,17 @@ func TestBuffer(t *testing.T) {
 
 func TestBuffer2(t *testing.T) {
 	buf := &Buffer{
-		Cap: 2,
+		MTU: 2,
 	}
 
 	buf.Append([]byte(MAGIC))
-	if buf.Size != len(MAGIC) || len(buf.Data) != 3 || cap(buf.Data[0]) != buf.Cap {
+	if buf.Size != len(MAGIC) || len(buf.Data) != 3 || cap(buf.Data[0]) != buf.MTU {
 		t.Error("Buffer Append magic err")
 	}
 
-	if string(buf.Data[0]) != string([]byte(MAGIC)[:buf.Cap]) ||
-		string(buf.Data[1]) != string([]byte(MAGIC)[buf.Cap:buf.Cap*2]) ||
-		string(buf.Data[2]) != string([]byte(MAGIC)[buf.Cap*2:]) {
+	if string(buf.Data[0]) != string([]byte(MAGIC)[:buf.MTU]) ||
+		string(buf.Data[1]) != string([]byte(MAGIC)[buf.MTU:buf.MTU*2]) ||
+		string(buf.Data[2]) != string([]byte(MAGIC)[buf.MTU*2:]) {
 		t.Error("Buffer Append magic content err")
 	}
 
@@ -1182,7 +1182,7 @@ func TestBuffer2(t *testing.T) {
 
 func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
 	buf := &Buffer{
-		Cap: 3,
+		MTU: 3,
 	}
 
 	dest := make([]byte, 11)
@@ -1221,7 +1221,7 @@ func TestAppendBuffer3(t *testing.T) {
 
 func TestAppendBufferWithUserBuffer(t *testing.T) {
 	buf := &Buffer{
-		Cap: 3,
+		MTU: 3,
 		Data: [][]byte {
 			make([]byte, 0, 2),
 			make([]byte, 0, 1),
@@ -1246,7 +1246,7 @@ func TestAppendBufferWithUserBuffer(t *testing.T) {
 
 func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 	buf := &Buffer{
-		Cap: 3,
+		MTU: 3,
 	}
 
 	dest := make([]byte, 11)

@@ -7,7 +7,7 @@ import (
 type Buffer struct {
 	schema       *Schema
 	heads        []byte
-	Cap          int
+	MTU          int
 	Size         int        //total size
 	index        int        //read index
 	pos          int        //read position
@@ -18,11 +18,11 @@ type Buffer struct {
 }
 
 func (buf *Buffer) setSchema(schema Schema) error {
-	if buf.Cap == 0 {
-		buf.Cap = TSSD_BUFFER_CAP
+	if buf.MTU == 0 {
+		buf.MTU = TSSD_BUFFER_MTU
 	}
 	buf.schema = &schema
-	buf.heads = make([]byte, 0, buf.Cap/3)
+	buf.heads = make([]byte, 0, buf.MTU/3)
 	//create a new buffer to receive
 	nbuf := &Buffer{
 		Data: [][]byte{
@@ -41,11 +41,11 @@ func (buf *Buffer) setSchema(schema Schema) error {
 		return err
 	}
 	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
-	avail := buf.Cap - buf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
+	avail := buf.MTU - buf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
 	nbuf.appendSize4(avail) //reserve sizet
 	nbuf.appendSize2(avail)
 	//we will keep a copy of schema in buf.heads
-	if nbuf.Size >= avail { //TSSD Heads too large than the cap(fragment limitation)
+	if nbuf.Size >= avail { //TSSD Heads too large than the MTU(fragment limitation)
 		return ErrorTSSDHeadOverSizeFragment
 	}
 	buf.heads = nbuf.Data[0][:nbuf.Size]
@@ -107,10 +107,10 @@ func (buf *Buffer) copyAndUpdate(bs []byte) {
 func (buf *Buffer) Append(bs []byte) *Buffer {
 	for len(bs) > 0 {
 		if buf.windex == len(buf.Data) {
-			if buf.Cap == 0 {
-				buf.Cap = TSSD_BUFFER_CAP
+			if buf.MTU == 0 {
+				buf.MTU = TSSD_BUFFER_MTU
 			}
-			buf.FragmentData = append(buf.FragmentData, make([]byte, 0, buf.Cap))
+			buf.FragmentData = append(buf.FragmentData, make([]byte, 0, buf.MTU))
 			if len(buf.heads) > 0 {
 				buf.FragmentData[buf.windex] = append(buf.FragmentData[buf.windex], buf.heads...)
 				buf.updateFragmentID(buf.windex, buf.windex+1)
