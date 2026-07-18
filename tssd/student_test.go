@@ -139,12 +139,19 @@ func TestStudent(t *testing.T) {
 	var v2 Student
 	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
 	fmt.Println("-----v:", v)
-	fmt.Println("-----v2:", v2)
+	
 	if !v.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
 
-	
+	n.Merge()
+	var v4 Student
+	tssd.UnmarshalTo(n, &v4)
+	fmt.Println("-----v4:", v4)
+	if !v.Equal(&v4) {
+		t.Error("TestStruct student merge failed")
+	}	
+
 	n, _ = tssd.Marshal(&v2)
 	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
