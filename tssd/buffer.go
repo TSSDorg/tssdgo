@@ -24,6 +24,7 @@ func (buf *Buffer) setSchema(schema Schema) error {
 	buf.heads = make([]byte, 0, buf.MTU/3)
 	//create a new buffer to receive
 	nbuf := &Buffer{
+		MTU: buf.MTU,
 		Data: [][]byte{
 			buf.heads,
 		},
@@ -40,7 +41,7 @@ func (buf *Buffer) setSchema(schema Schema) error {
 		return err
 	}
 	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
-	avail := buf.MTU - buf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
+	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
 	nbuf.appendSize4(avail) //reserve sizet
 	nbuf.appendSize2(avail)
 	//we will keep a copy of schema in buf.heads

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	//"unsafe"
+	"unsafe"
 )
 
 const (
@@ -140,15 +140,16 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 		return data, err
 	}
 
-	var posData, posChecksum int
-
-	posData, frag.Data, err = mergeByteSliceDump(buf)
+	posData := buf.pos + 8
+	frag.Data, err = mergeByteSliceDump(data[buf.pos:])
 	if err != nil {
 		return data, err
 	}
 	//data before Checksum need hash to validate
-	needCheck := data[0:buf.pos]
-	posChecksum, frag.Checksum, err = mergeByteSliceDump(buf)
+	needCheck := data[0 : posData+len(frag.Data)]
+
+	posChecksum := len(needCheck) + 8
+	frag.Checksum, err = mergeByteSliceDump(data[len(needCheck):])
 	if err != nil {
 		return data, err
 	}
@@ -156,12 +157,12 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err = frag.Validate(needCheck); err != nil {
 		return data, err
 	}
-	frag.Raw = make([]byte, buf.pos)
+	frag.Raw = make([]byte, posChecksum+len(frag.Checksum))
 	copy(frag.Raw, data)
 	frag.Data = frag.Raw[posData : posData+len(frag.Data)]
 	frag.Checksum = frag.Raw[posChecksum : posChecksum+len(frag.Checksum)]
 
-	return buf.Data[0][buf.pos:], nil
+	return data[posChecksum+len(frag.Checksum):], nil
 }
 
 func (frag *Fragment) Validate(input []byte) error {
@@ -172,24 +173,27 @@ func (frag *Fragment) Validate(input []byte) error {
 }
 
 // [Tarraym][Tbyte][sizet][sizea][...]
-func mergeByteSliceDump(buf *Buffer) (int, []byte, error) {
-	bs, err := buf.Read(make([]byte, 2))
-	if err != nil {
-		return 0, nil, err
-	}
-	if string(bs) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
-		return 0, nil, ErrorInvalidTSSDData
+func mergeByteSliceDump(input []byte) ([]byte, error) {
+	if len(input) < 8 {
+		return nil, ErrorInSufficientData
 	}
 
-	_, arrayN, err := checkDumpSize(buf)
-	if err != nil {
-		return 0, nil, err
+	if string(input[:2]) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
+		return nil, ErrorInvalidTSSDData
 	}
-	//we don't copy here, so manully updat buf
-	dest := buf.Data[buf.index][buf.pos : buf.pos+arrayN]
-	buf.Size -= arrayN
-	buf.pos += arrayN
-	return buf.pos - arrayN, dest, nil
+	var size4 int32
+	copy(Slice(Ptr(&size4), unsafe.Sizeof(size4)), input[2:])
+	var arrayN int16
+	copy(Slice(Ptr(&arrayN), unsafe.Sizeof(arrayN)), input[6:])
+
+	if size4 != int32(arrayN) {
+		return nil, ErrorInvalidTSSDData
+	}
+	if len(input[8:]) < int(arrayN) {
+		return nil, ErrorInSufficientData
+	}
+
+	return input[8 : 8+int(arrayN)], nil
 }
 
 func init() {
