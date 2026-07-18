@@ -148,13 +148,12 @@ func (buf *Buffer) ReadByte() (b byte, err error) {
 	return b, err
 }
 
-func (buf *Buffer) Unread(n int) {
-	if buf.pos < n {
-		buf.index--
-		buf.pos += buf.avail(buf.index)
+// peak a byte from buffer without change read off
+func (buf *Buffer) PeekByte() (b byte, err error) {
+	if buf.Size == 0 {
+		return 0, ErrorInSufficientData
 	}
-	buf.pos -= n
-	buf.Size += n
+	return buf.Fragments[buf.index].Data[buf.pos], nil
 }
 
 func (buf *Buffer) avail(index int) int {

@@ -29,7 +29,6 @@ func (node *Node) print() {
 
 func dprintf[T comparable](info *typeInfo, format string, buf *Buffer) (string, error) {
 	var d T
-	buf.Unread(1)
 	err := info.dump(info, buf, Ptr(&d))
 	return fmt.Sprintf(format, info.name, info.rtype.String(), d), err
 }
@@ -69,7 +68,7 @@ func parseMergeArray(info *typeInfo, ttype int8, buf *Buffer) (string, error) {
 }
 
 func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
-	b, err := buf.ReadByte()
+	b, err := buf.PeekByte()
 	if err != nil {
 		return err
 	}
@@ -107,7 +106,6 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 	case Tstring:
 		node.Content, err = dprintf[string](info, "%s(%s): %s", buf)
 	case Ttime:
-		buf.Unread(1)
 		var t time.Time
 		err := info.timeDump(buf, Ptr(&t))
 		if err != nil {
@@ -129,6 +127,10 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		}
 		return nil
 	case Tarray:
+		_, err := buf.ReadByte()
+		if err != nil {
+			return err
+		}
 		sizet, arrayN, err := checkDumpSize(buf)
 		if err != nil {
 			return err
@@ -142,7 +144,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		}
 		return nil
 	case Tarraym: //[Tarraym][Ttype][sizet][sizea][data]
-		b, err := buf.ReadByte()
+		b, err := buf.Read(make([]byte, 2))
 		if err != nil {
 			return err
 		}
@@ -153,7 +155,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 
 		node.Content = fmt.Sprintf("%s(%s[totalSize:%d]: len:%d)%s[", info.name, info.rtype.String(), sizet, arrayN, info.info[0].rtype.String())
 		for i := 0; i < arrayN; i++ {
-			s, err := parseMergeArray(&info.info[0], int8(b), buf)
+			s, err := parseMergeArray(&info.info[0], int8(b[1]), buf)
 			if err != nil {
 				return err
 			}
@@ -162,6 +164,10 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		node.Content += "]"
 		return nil
 	case Tdict:
+		_, err := buf.ReadByte()
+		if err != nil {
+			return err
+		}
 		sizet, mapLen, err := checkDumpSize(buf)
 		if err != nil {
 			return err
@@ -185,7 +191,6 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 			}
 			info.info[1].parse(kvNode, buf)
 		}
-
 		return nil
 	default:
 		fmt.Println("error: not support type:", b)
