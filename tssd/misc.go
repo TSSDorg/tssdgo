@@ -2,6 +2,8 @@ package tssd
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 )
 
 func SliceEqual[T comparable](a, b []T) bool {
@@ -52,6 +54,16 @@ func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
 func Pipe(sender *Buffer) (receiver *Buffer) {
 
 	receiver = &Buffer{}
+	numbers := make([]int, len(sender.Fragments))
+	for i := 0; i < len(numbers); i++ {
+		numbers[i] = i
+	}
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+	// Shuffle the slice
+	rand.Shuffle(len(numbers), func(i, j int) {
+		numbers[i], numbers[j] = numbers[j], numbers[i]
+	})
 
 	//TSSD produce in the sender.FragmentData
 	for i := 0; i < len(sender.Fragments); i++ {
