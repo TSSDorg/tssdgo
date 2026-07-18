@@ -156,7 +156,6 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err = frag.Validate(needCheck); err != nil {
 		return data, err
 	}
-
 	frag.Raw = make([]byte, buf.pos)
 	copy(frag.Raw, data)
 	frag.Data = frag.Raw[posData : posData+len(frag.Data)]
@@ -190,7 +189,7 @@ func mergeByteSliceDump(buf *Buffer) (int, []byte, error) {
 	dest := buf.Data[buf.index][buf.pos : buf.pos+arrayN]
 	buf.Size -= arrayN
 	buf.pos += arrayN
-	return buf.pos, dest, nil
+	return buf.pos - arrayN, dest, nil
 }
 
 func init() {

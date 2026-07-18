@@ -1,7 +1,7 @@
 package tssd
 
 import (
-	//"fmt"
+	"fmt"
 )
 
 func SliceEqual[T comparable](a, b []T) bool {
@@ -39,31 +39,31 @@ func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for k,v := range a {
-		if !v.Equal(b[k]){
+	for k, v := range a {
+		if !v.Equal(b[k]) {
 			return false
 		}
 	}
 	return true
 }
 
-//convert a sender buffer to a receiver buffer
-//normall it is called in test only
+// convert a sender buffer to a receiver buffer
+// normall it is called in test only
 func Pipe(sender *Buffer) (receiver *Buffer) {
-	return sender
-	/*	receiver = &Buffer{}
+
+	receiver = &Buffer{}
 
 	//TSSD produce in the sender.FragmentData
-	for i:=0; i<len(sender.FragmentData); i++ {
+	for i := 0; i < len(sender.Fragments); i++ {
 		frag := &Fragment{}
-		_, err := frag.Unmarshal(sender.FragmentData[i])
+		_, err := frag.Unmarshal(sender.Fragments[i].Raw)
 		if err != nil {
-			fmt.Println("data:", sender.FragmentData[i])
+			fmt.Println("data:", sender.Fragments[i].Raw)
 			panic("pipe output unmashal fail")
 		}
 		receiver.Push(frag)
 	}
-		
+
 	return receiver
-*/
+
 }
