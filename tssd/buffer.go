@@ -1,6 +1,7 @@
 package tssd
 
 import (
+	//"fmt"
 	"unsafe"
 )
 
@@ -297,28 +298,25 @@ func (buf *Buffer) Wanted() int {
 }
 
 // merge all Fragments into one
-func (buf *Buffer) Merge() {
+func (buf *Buffer) Merge() *Buffer {
 	if len(buf.Fragments) < 2 {
-		return
+		return buf
 	}
-
 	frags := buf.Fragments //old frags
-
 	buf.Fragments = []Fragment{
 		Fragment{
 			Header: frags[0].Header,
 			Schema: frags[0].Schema,
-			//Data: make([]byte, buf.Size)
-			Raw: make([]byte, 0, len(buf.Fragments[0].Raw)-len(buf.Fragments[0].Data)+buf.Size),
+			Raw:    make([]byte, 0, len(buf.Fragments[0].Raw)-len(buf.Fragments[0].Data)+buf.Size),
 		},
 	}
 	frag := &buf.Fragments[0] //new one
-
 	headLen := len(frags[0].Raw) - TSSD_CHECKSUM_LENGTH - len(frags[0].Data)
 	frag.Raw = append(frag.Raw, frags[0].Raw[:headLen]...)
 	frag.Data = frag.Raw[headLen:headLen]
 	buf.Size = 0
 	buf.windex = 0
+	buf.MTU = cap(frag.Raw)
 	if len(buf.heads) == 0 {
 		buf.heads = frag.Raw[0:headLen]
 	}
@@ -327,4 +325,27 @@ func (buf *Buffer) Merge() {
 		buf.Append(frags[i].Data)
 	}
 	buf.finish()
+	return buf
+}
+
+// split large fragments into small ones
+func (buf *Buffer) Split(mtu int) *Buffer {
+	nMTU := max(mtu, TSSD_BUFFER_MIN_MTU)
+	if buf.MTU < nMTU {
+		return buf
+	}
+	// merge first
+	buf.Merge()
+	frag := &buf.Fragments[0]
+
+	// init buf by the new mtu
+	buf.MTU = nMTU
+	buf.Size = 0
+	buf.windex = 0
+	buf.index = 0
+	buf.pos = 0
+	buf.Fragments = []Fragment{}
+
+	// append all data back
+	return buf.Append(frag.Data)
 }

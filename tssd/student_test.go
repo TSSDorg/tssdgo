@@ -144,13 +144,27 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct student failed")
 	}
 
+	beforeMTU, beforeLen :=  n.MTU, len(n.Fragments)
+	n.Split(378) //do nothing when split large
+	if beforeMTU != n.MTU || beforeLen != len(n.Fragments) {
+		t.Error("TestStudent split large MTU should do nothing")
+	}
+
 	n.Merge()
 	var v4 Student
 	tssd.UnmarshalTo(n, &v4)
 	fmt.Println("-----v4:", v4)
 	if !v.Equal(&v4) {
 		t.Error("TestStruct student merge failed")
-	}	
+	}
+
+	n.Rewind().Split(378)
+	var v5 Student
+	tssd.UnmarshalTo(n, &v5)
+	fmt.Println("-----v5:", v5, len(n.Fragments), n.MTU)
+	if !v.Equal(&v5) {
+		t.Error("TestStruct student split failed")
+	}
 
 	n, _ = tssd.Marshal(&v2)
 	if len(n.Fragments[0].Data) == 0 {
