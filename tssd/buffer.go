@@ -17,7 +17,7 @@ type Buffer struct {
 	Fragments   []Fragment //framents list sending/received
 }
 
-func (buf *Buffer) begin(schema Schema) error {
+func (buf *Buffer) prepare(schema Schema) error {
 	if buf.MTU == 0 {
 		buf.MTU = TSSD_BUFFER_MTU
 	}
