@@ -61,7 +61,15 @@ func TestBuffer2(t *testing.T) {
 	}
 }
 
-/*
+func getData(buf *Buffer) [][]byte {
+
+	ret := make([][]byte, len(buf.Fragments))
+	for i := 0; i < len(buf.Fragments); i++ {
+		ret[i] = buf.Fragments[i].Data
+	}
+	return ret
+}
+
 func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
 	buf := &Buffer{
 		MTU: 3,
@@ -73,34 +81,34 @@ func appendBuffer3(t *testing.T, first, second int, r1, r2 [][]byte) {
 	}
 
 	buf.Append(dest[:first])
-	if !SliceSliceEqual(buf.Data, r1) {
-		t.Error("Buffer append r1 err:", buf.Data, r1)
+	if !SliceSliceEqual(getData(buf), r1) {
+		t.Error("Buffer append r1 e rr:", getData(buf), r1)
 	}
 
 	buf.Append(dest[:second])
-	if !SliceSliceEqual(buf.Data, r2) {
-		t.Error("Buffer append r2 err:", buf.Data, r2)
+	if !SliceSliceEqual(getData(buf), r2) {
+		t.Error("Buffer append r2 err:", getData(buf), r2)
 	}
 }
 
 func TestAppendBuffer3(t *testing.T) {
-	appendBuffer3(t, 0, 0, [][]byte {},   [][]byte {})
-	appendBuffer3(t, 0, 1, [][]byte {},   [][]byte {[]byte{100},})
-	appendBuffer3(t, 1, 0, [][]byte {[]byte{100},},   [][]byte {[]byte{100},})
-	appendBuffer3(t, 1, 1, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100},})
-	appendBuffer3(t, 1, 2, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},})
-	appendBuffer3(t, 1, 3, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102}})
-	appendBuffer3(t, 1, 4, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102, 103}})
-	appendBuffer3(t, 1, 5, [][]byte {[]byte{100},},   [][]byte {[]byte{100, 100, 101},[]byte{102, 103, 104}})
+	appendBuffer3(t, 0, 0, [][]byte{}, [][]byte{})
+	appendBuffer3(t, 0, 1, [][]byte{}, [][]byte{[]byte{100}})
+	appendBuffer3(t, 1, 0, [][]byte{[]byte{100}}, [][]byte{[]byte{100}})
+	appendBuffer3(t, 1, 1, [][]byte{[]byte{100}}, [][]byte{[]byte{100, 100}})
+	appendBuffer3(t, 1, 2, [][]byte{[]byte{100}}, [][]byte{[]byte{100, 100, 101}})
+	appendBuffer3(t, 1, 3, [][]byte{[]byte{100}}, [][]byte{[]byte{100, 100, 101}, []byte{102}})
+	appendBuffer3(t, 1, 4, [][]byte{[]byte{100}}, [][]byte{[]byte{100, 100, 101}, []byte{102, 103}})
+	appendBuffer3(t, 1, 5, [][]byte{[]byte{100}}, [][]byte{[]byte{100, 100, 101}, []byte{102, 103, 104}})
 
-	appendBuffer3(t, 2, 1, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100},})
-	appendBuffer3(t, 2, 2, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101}})
-	appendBuffer3(t, 2, 3, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102}})
-	appendBuffer3(t, 2, 4, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102, 103}})
-	appendBuffer3(t, 2, 5, [][]byte {[]byte{100, 101},},   [][]byte {[]byte{100, 101, 100}, []byte{101, 102, 103}, []byte{104}})
+	appendBuffer3(t, 2, 1, [][]byte{[]byte{100, 101}}, [][]byte{[]byte{100, 101, 100}})
+	appendBuffer3(t, 2, 2, [][]byte{[]byte{100, 101}}, [][]byte{[]byte{100, 101, 100}, []byte{101}})
+	appendBuffer3(t, 2, 3, [][]byte{[]byte{100, 101}}, [][]byte{[]byte{100, 101, 100}, []byte{101, 102}})
+	appendBuffer3(t, 2, 4, [][]byte{[]byte{100, 101}}, [][]byte{[]byte{100, 101, 100}, []byte{101, 102, 103}})
+	appendBuffer3(t, 2, 5, [][]byte{[]byte{100, 101}}, [][]byte{[]byte{100, 101, 100}, []byte{101, 102, 103}, []byte{104}})
 }
 
-
+/*
 func TestAppendBufferWithUserBuffer(t *testing.T) {
 	buf := &Buffer{
 		MTU: 3,
@@ -124,7 +132,7 @@ func TestAppendBufferWithUserBuffer(t *testing.T) {
 	if !SliceSliceEqual(buf.Data, [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105}, []byte{106, 107, 108}, []byte{109, 110, 100},[]byte{101},}) {
 		t.Error("Buffer append r1 err:", buf.Data)
 	}
-}
+}*/
 
 func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 	buf := &Buffer{
@@ -142,7 +150,7 @@ func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 		dest[i] = byte(0)
 	}
 	d, err := buf.Read(dest[:first])
-	if err != nil || !SliceEqual(d, r1) || !SliceEqual(dest[:first], r1){
+	if err != nil || !SliceEqual(d, r1) || !SliceEqual(dest[:first], r1) {
 		t.Error("Buffer read r1 err:", err, d, r1)
 	}
 
@@ -150,7 +158,7 @@ func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
 		dest[i] = byte(0)
 	}
 	d, err = buf.Read(dest[:second])
-	if err != nil || !SliceEqual(d, r2) || !SliceEqual(dest[:second], r2){
+	if err != nil || !SliceEqual(d, r2) || !SliceEqual(dest[:second], r2) {
 		t.Error("Buffer read 4 bytes err:", err, d, r2)
 	}
 }
@@ -175,7 +183,6 @@ func TestReadBuffer3(t *testing.T) {
 	readBuffer3(t, 2, 8, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109})
 	readBuffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
 }
-*/
 
 func TestBufferAppendAndReadRoundTrip(t *testing.T) {
 	buf := &Buffer{MTU: 32}
