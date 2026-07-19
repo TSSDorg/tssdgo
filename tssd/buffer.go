@@ -157,7 +157,11 @@ func (buf *Buffer) PeekByte() (b byte, err error) {
 }
 
 func (buf *Buffer) avail(index int) int {
-	return cap(buf.Fragments[buf.index].Data) - TSSD_CHECKSUM_LENGTH
+	ret := cap(buf.Fragments[buf.index].Data)
+	if len(buf.heads) > 0 {
+		ret -= TSSD_CHECKSUM_LENGTH
+	}
+	return ret
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -261,7 +265,11 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 		fid = -fid
 	}
 	if cap(buf.Fragments) < fid {
-		buf.Fragments = append(buf.Fragments, make([]Fragment, fid, max(fid, 32))...)
+		frags := buf.Fragments
+		buf.Fragments = make([]Fragment, cap(frags)+32)
+		for i := 0; i < cap(frags); i++ {
+			buf.Fragments[i] = frags[i]
+		}
 	}
 
 	if buf.Fragments[fid-1].Schema.Fragment != 0 {
@@ -271,6 +279,9 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	//we always copy it, even repeat push
 	buf.Fragments[fid-1] = *frag
 	buf.Size += len(buf.Fragments[fid-1].Data)
+	if len(buf.heads) == 0 && len(buf.Fragments[0].Raw) > len(buf.Fragments[0].Data) {
+		buf.heads = buf.Fragments[0].Raw[0 : len(buf.Fragments[0].Raw)-len(buf.Fragments[0].Data)]
+	}
 
 	if miss = buf.Wanted(); miss != 0 {
 		return miss, ErrorInSufficientData
