@@ -6,14 +6,15 @@ import (
 )
 
 type Buffer struct {
-	schema    *Schema
-	heads     []byte
-	MTU       int
-	Size      int        //total size
-	index     int        //read index
-	pos       int        //read position
-	windex    int        //write index
-	Fragments []Fragment //framents list sending/received
+	schema      *Schema
+	heads       []byte
+	lenChecksum int
+	MTU         int
+	Size        int        //total size
+	index       int        //read index
+	pos         int        //read position
+	windex      int        //write index
+	Fragments   []Fragment //framents list sending/received
 }
 
 func (buf *Buffer) begin(schema Schema) error {
@@ -50,6 +51,7 @@ func (buf *Buffer) begin(schema Schema) error {
 		return ErrorTSSDHeadOverSizeFragment
 	}
 	buf.heads = nbuf.Fragments[0].Data[:nbuf.Size]
+	buf.lenChecksum = TSSD_CHECKSUM_LENGTH
 	return nil
 }
 
@@ -157,11 +159,7 @@ func (buf *Buffer) PeekByte() (b byte, err error) {
 }
 
 func (buf *Buffer) avail(index int) int {
-	ret := cap(buf.Fragments[buf.index].Data)
-	if len(buf.heads) > 0 {
-		ret -= TSSD_CHECKSUM_LENGTH
-	}
-	return ret
+	return cap(buf.Fragments[buf.index].Data) - buf.lenChecksum
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -281,6 +279,7 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	buf.Size += len(buf.Fragments[fid-1].Data)
 	if len(buf.heads) == 0 && len(buf.Fragments[0].Raw) > len(buf.Fragments[0].Data) {
 		buf.heads = buf.Fragments[0].Raw[0 : len(buf.Fragments[0].Raw)-len(buf.Fragments[0].Data)]
+		buf.lenChecksum = TSSD_CHECKSUM_LENGTH
 	}
 
 	if miss = buf.Wanted(); miss != 0 {
