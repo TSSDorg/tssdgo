@@ -124,6 +124,17 @@ func (ti *typeInfo) timeSave(src Ptr, buf *Buffer) error {
 	return nil
 }
 
+// dump string directly
+func stringDump(buf *Buffer, dest *string) error {
+	sizet, err := checkDumpSizet(buf)
+	if err != nil {
+		return err
+	}
+	bs, _ := buf.Read(make([]byte, sizet))
+	*dest = string(bs)
+	return nil
+}
+
 func (ti *typeInfo) timeDump(buf *Buffer, dest Ptr) error {
 	b, err := buf.ReadByte()
 	if err != nil {
@@ -136,19 +147,17 @@ func (ti *typeInfo) timeDump(buf *Buffer, dest Ptr) error {
 			return err
 		}
 		if b != byte(Tstring) {
-			return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
+			return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, Tstring)
 		}
-		sizet, err := checkDumpSizet(buf)
+		var rfc3339Str string
+		if err = stringDump(buf, &rfc3339Str); err != nil {
+			return err
+		}
+		t, err := time.Parse(time.RFC3339Nano, rfc3339Str)
 		if err != nil {
 			return err
 		}
 		p := (*time.Time)(dest)
-		rfc3339Str, _ := buf.Read(make([]byte, sizet)) //we have check sizet before
-
-		t, err := time.Parse(time.RFC3339Nano, string(rfc3339Str))
-		if err != nil {
-			return err
-		}
 		*p = t
 	case -ti.Type:
 		//skip this field
@@ -171,13 +180,9 @@ func (ti *typeInfo) strDump(buf *Buffer, dest Ptr) error {
 	}
 	switch int8(b) {
 	case ti.Type:
-		sizet, err := checkDumpSizet(buf)
-		if err != nil {
+		if err = stringDump(buf, (*string)(dest)); err != nil {
 			return err
 		}
-		p := (*string)(dest)
-		str, _ := buf.Read(make([]byte, sizet))
-		*p = string(str)
 	case -ti.Type:
 		//skip this field
 	default:
