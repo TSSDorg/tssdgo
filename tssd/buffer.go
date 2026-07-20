@@ -85,6 +85,9 @@ func (buf *Buffer) finish() {
 	appendSize4(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
 	appendSize2(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZEA_LENGTH], length)
 
+	//reset Raw to the real size, we will use Raw to send out
+	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[:pos+length]
+
 	//at last we need append checksum when finish(many sizet will update at finish)
 	for i := 0; i <= buf.windex; i++ {
 		buf.appendChecksum(i)
@@ -101,26 +104,19 @@ func (buf *Buffer) appendChecksum(index int) {
 	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, checksum...)
 }
 
-func (buf *Buffer) copyAndUpdate(bs []byte) {
-	buf.Fragments[buf.windex].Data = append(buf.Fragments[buf.windex].Data, bs...)
-	l := len(buf.Fragments[buf.windex].Raw)
-	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[:l+len(bs)]
-	buf.Size += len(bs)
-}
-
 func (buf *Buffer) Append(bs []byte) *Buffer {
 	for len(bs) > 0 {
 		if buf.windex == len(buf.Fragments) {
 			if buf.MTU == 0 {
 				buf.MTU = TSSD_BUFFER_MTU
 			}
-			b := make([]byte, len(buf.heads), buf.MTU)
+			b := make([]byte, buf.MTU, buf.MTU)
 			copy(b, buf.heads)
 
 			buf.Fragments = append(buf.Fragments,
 				Fragment{
-					Data: b[len(buf.heads):],
-					Raw:  b,
+					Data: b[len(buf.heads):len(buf.heads)],
+					Raw:  b[:buf.MTU-buf.lenChecksum],
 				})
 			if buf.schema != nil {
 				buf.Fragments[buf.windex].Schema = *buf.schema
@@ -129,12 +125,14 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 		}
 
 		if len(buf.Fragments[buf.windex].Data)+len(bs) <= buf.avail(buf.windex) {
-			buf.copyAndUpdate(bs)
+			buf.Fragments[buf.windex].Data = append(buf.Fragments[buf.windex].Data, bs...)
+			buf.Size += len(bs)
 			return buf
 		}
 
 		fill := buf.avail(buf.windex) - len(buf.Fragments[buf.windex].Data)
-		buf.copyAndUpdate(bs[:fill])
+		buf.Fragments[buf.windex].Data = append(buf.Fragments[buf.windex].Data, bs[:fill]...)
+		buf.Size += fill
 		bs = bs[fill:]
 		buf.windex++
 	}
@@ -160,7 +158,7 @@ func (buf *Buffer) PeekByte() (b byte, err error) {
 }
 
 func (buf *Buffer) avail(index int) int {
-	return cap(buf.Fragments[buf.index].Data) - buf.lenChecksum
+	return cap(buf.Fragments[index].Data) - buf.lenChecksum
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
