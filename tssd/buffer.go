@@ -253,13 +253,13 @@ func (buf *Buffer) updateSize(index, pos, value int) {
 	}
 }
 
-func dumpSize2(buf *Buffer) (int, error) {
+func (buf *Buffer) dumpSize2() (int, error) {
 	var size int16
 	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZEA_LENGTH))
 	return int(size), err
 }
 
-func dumpSize4(buf *Buffer) (int, error) {
+func (buf *Buffer) dumpSize4() (int, error) {
 	var size int32
 	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZET_LENGTH))
 	return int(size), err
@@ -267,7 +267,7 @@ func dumpSize4(buf *Buffer) (int, error) {
 
 // check and dump sizet
 func (buf *Buffer) checkDumpSizet() (sizet int, err error) {
-	if sizet, err = dumpSize4(buf); err != nil {
+	if sizet, err = buf.dumpSize4(); err != nil {
 		return 0, err
 	}
 	if buf.Size < sizet {
@@ -283,7 +283,7 @@ func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
 		return
 	}
 	//we have check total size in checkDumpSizet, so dump sizea directly
-	sizea, err = dumpSize2(buf)
+	sizea, err = buf.dumpSize2()
 	return sizet, sizea, err
 }
 
