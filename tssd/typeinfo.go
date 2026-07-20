@@ -32,62 +32,6 @@ type typeInfo struct {
 	root *typeInfo //typeInfo root
 }
 
-// put a binary content into a slice
-// yeah! convert everything to byte slice
-func Slice(k Ptr, size Size_t) []byte {
-	p := (*[1<<31 - 1]byte)(k) //yeah, it's magic number, which is maxnum can be accept by golang compiler
-	return (*p)[0:size]
-}
-
-func appendSize2(dest []byte, le int) []byte {
-	l := int16(le)
-	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
-}
-
-func appendSize4(dest []byte, le int) []byte {
-	l := int32(le)
-	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
-}
-
-func dumpSize2(buf *Buffer) (int, error) {
-	var size int16
-	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZEA_LENGTH))
-	return int(size), err
-}
-
-func dumpSize4(buf *Buffer) (int, error) {
-	var size int32
-	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZET_LENGTH))
-	return int(size), err
-}
-
-// check and dump sizet
-func checkDumpSizet(buf *Buffer) (sizet int, err error) {
-	if sizet, err = dumpSize4(buf); err != nil {
-		return 0, err
-	}
-	if buf.Size < sizet {
-		//TODO, add field name info
-		return 0, ErrorInSufficientData
-	}
-	return sizet, nil
-}
-
-// check and dump sizet, sizea
-func checkDumpSize(buf *Buffer) (sizet int, sizea int, err error) {
-	if sizet, err = checkDumpSizet(buf); err != nil {
-		return
-	}
-	//we have check total size in checkDumpSizet, so dump sizea directly
-	sizea, err = dumpSize2(buf)
-	return sizet, sizea, err
-}
-
-/*
-func appendString(dest []byte, s string) []byte {
-	return append(appendSize4(dest, len(s)), s...)
-}*/
-
 func (info *typeInfo) types() []byte {
 	return info.stype
 }

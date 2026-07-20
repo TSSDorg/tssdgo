@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+// put a binary content into a slice
+// yeah! convert everything to byte slice
+func Slice(k Ptr, size Size_t) []byte {
+	p := (*[1<<31 - 1]byte)(k) //yeah, it's magic number, which is maxnum can be accept by golang compiler
+	return (*p)[0:size]
+}
+
 func SliceEqual[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
