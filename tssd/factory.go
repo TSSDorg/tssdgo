@@ -49,7 +49,10 @@ func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	if !ok {
 		return ErrorTSSDDataSchemaUnmatch
 	}
-	buf.prepare(flat.Schema())
+
+	if err := buf.prepare(flat.Schema()); err != nil {
+		return err
+	}
 	err := bi.info.marshalTo(flat, buf)
 	buf.finish()
 	return err

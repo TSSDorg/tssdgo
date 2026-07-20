@@ -218,7 +218,7 @@ func (buf *Buffer) appendString(s string) *Buffer {
 
 // [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet/4B][sizea/2B][FID][...]
 func (buf *Buffer) updateFragmentID(index, n int) {
-	if len(buf.Fragments[index].Raw) < 17 {
+	if len(buf.heads) == 0 || len(buf.Fragments[index].Raw) < 17 {
 		return
 	}
 	l := int16(n)
