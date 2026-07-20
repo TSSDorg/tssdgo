@@ -46,26 +46,28 @@ func TestString(t *testing.T) {
 	var s2 ss
 	container := parse(sin1)
 
-	b, e := container.marshal(&sin1, make([]byte, 0, 2048))
-	if e != nil || len(b) == 0 {
+	buff := &Buffer{}
+	e := container.marshalTo(&sin1, buff)
+	if e != nil || len(buff.Fragments[0].Data) == 0 {
 		t.Errorf("Test String Marshal err %s", e)
 	}
 
-	fmt.Println("testString out buf:", b)
-	container.print(b)
+	fmt.Println("testString out buf:", buff)
+	container.print(*buff)
 	fmt.Println("testString out end")
 
-	container.unmarshal(b, &s2)
+	container.unmarshal(buff, &s2)
 	if !reflect.DeepEqual(sin1, s2) {
 		t.Errorf("Test String err: [%s], [%s]", sin1.Str, s2.Str)
 	}
 
-	b, e = container.marshal(&sin2, make([]byte, 0, 2048))
+	buff2 := &Buffer{}
+	e = container.marshalTo(&sin2, buff2)
 	if e != nil {
 		t.Errorf("Test String Marshal err %s", e)
 	}
-	container.print(b)
-	container.unmarshal(b, &s2)
+	container.print(*buff2)
+	container.unmarshal(buff2, &s2)
 	if !reflect.DeepEqual(sin2, s2) {
 		t.Errorf("Test String err: [%s], [%s]", sin2.Str, s2.Str)
 	}
@@ -82,8 +84,8 @@ func TestSimpleStringSlice(t *testing.T) {
 	}
 	var sout slice
 	container := parse(sin)
-	buf, _ := container.marshal(&sin, make([]byte, 0, 2048))
-	container.print(buf)
+	buf, _ := container.marshal(&sin)
+	container.print(*buf)
 	fmt.Println("TestSimpleStringSlice buf:", buf)
 
 	container.unmarshal(buf, &sout)
@@ -107,7 +109,7 @@ func TestStringSlice(t *testing.T) {
 	}
 	var s2 ss
 	container := parse(sin1)
-	buf, _ := container.marshal(&sin1, make([]byte, 0, 2048))
+	buf, _ := container.marshal(&sin1)
 
 	container.unmarshal(buf, &s2)
 	if !reflect.DeepEqual(sin1, s2) {
@@ -129,7 +131,7 @@ func TestStringArray(t *testing.T) {
 	}
 	var s2 ss
 	container := parse(sin1)
-	n, _ := container.marshal(&sin1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&sin1)
 
 	fmt.Println(container)
 	fmt.Println(sin1, n)
@@ -157,7 +159,7 @@ func TestSliceXXX(t *testing.T) {
 	var s2 ss
 
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println("=========================TestSlice================================", n)
 	fmt.Printf("%p, %p\n", &s2, &s2.I)
 	fmt.Println(s2)
@@ -168,7 +170,7 @@ func TestSliceXXX(t *testing.T) {
 	fmt.Println("after alloc:", s2)
 
 	container.unmarshal(n, &s2)
-	fmt.Printf("after unmarshal %p, %p %p %p %p\n", &s2, &s2.I, &s2.I[0], &s2.I64, &s2.I64[0])
+	//fmt.Printf("after unmarshal %p, %p %p %p %p\n", &s2, &s2.I, &s2.I[0], &s2.I64, &s2.I64[0])
 	if !reflect.DeepEqual(in1, s2) {
 		fmt.Println(in1, s2)
 		t.Errorf("Test String slice err ")
@@ -182,7 +184,7 @@ func TestSliceUint(t *testing.T) {
 	var s2 []int8
 
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println(s2)
 
 	container.unmarshal(n, &s2)
@@ -211,7 +213,7 @@ func TestSlice(t *testing.T) {
 	var s2 ss
 
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println("=========================TestSlice================================", n)
 
 	container.unmarshal(n, &s2)
@@ -226,7 +228,7 @@ func TestSlice(t *testing.T) {
 		[]int64{},
 		[]byte{},
 	}
-	n, _ = container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ = container.marshal(&in1)
 
 	container.unmarshal(n, &s2)
 	fmt.Println("Test slice:", len(s2.I), len(s2.Strs), len(s2.I64), len(s2.B))
@@ -251,7 +253,7 @@ func TestArray(t *testing.T) {
 	}
 	var s2 ss
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println(in1)
 
 	container.unmarshal(n, &s2)
@@ -281,7 +283,7 @@ func TestNestStruct(t *testing.T) {
 	}
 	var s2 ss
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println(in1)
 
 	container.unmarshal(n, &s2)
@@ -312,7 +314,7 @@ func TestNestStructSlice(t *testing.T) {
 	fmt.Println("Test TestNestStructSlice begin ~~~~~~~~~~~~~~")
 	var s2 sout
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println(in1)
 
 	container.unmarshal(n, &s2)
@@ -338,7 +340,7 @@ func TestEmptySlice(t *testing.T) {
 	fmt.Println("Test TestEmptySlice begin ~~~~~~~~~~~~~~")
 	var s2 sin
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 
 	container.unmarshal(n, &s2)
 	fmt.Println("in1:", in1)
@@ -371,7 +373,7 @@ func TestNestStructArray(t *testing.T) {
 	fmt.Println("Test TestNestStructArray begin ~~~~~~~~~~~~~~")
 	var s2 sout
 	container := parse(in1)
-	n, _ := container.marshal(&in1, make([]byte, 0, 2048))
+	n, _ := container.marshal(&in1)
 	fmt.Println("in1:", in1)
 
 	container.unmarshal(n, &s2)
@@ -420,7 +422,7 @@ func TestMap(t *testing.T) {
 	s1.St.M2["we"] = "wefwereeefe"
 
 	container := parse(s1)
-	b, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	b, _ := container.marshal(&s1)
 
 	container.unmarshal(b, &s2)
 
@@ -437,7 +439,7 @@ func TestSimpleTime(t *testing.T) {
 
 	tt := time.Now()
 	container := parse(tt)
-	b, _ := container.marshal(&tt, make([]byte, 0, 2048))
+	b, _ := container.marshal(&tt)
 
 	var v2 time.Time
 	container.unmarshal(b, &v2)
@@ -455,7 +457,7 @@ func TestEmbedStruct(t *testing.T) {
 
 	fmt.Println(v)
 	container := parse(v)
-	b, _ := container.marshal(&v, make([]byte, 0, 2048))
+	b, _ := container.marshal(&v)
 
 	var v2 TestStruct
 	container.unmarshal(b, &v2)
@@ -471,7 +473,7 @@ func TestTime(t *testing.T) {
 
 	fmt.Println(v)
 	container := parse(v)
-	b, _ := container.marshal(&v, make([]byte, 0, 2048))
+	b, _ := container.marshal(&v)
 
 	var v2 TestStruct
 	container.unmarshal(b, &v2)
@@ -501,7 +503,7 @@ func TestFlatSliceArray(t *testing.T) {
 
 	container := parse(s1)
 	//fmt.Println(container)
-	b, _ := container.marshal(&s1, make([]byte, 0, 2048))
+	b, _ := container.marshal(&s1)
 	//fmt.Printf("s1: %p, si: %p, s2: %p, si: %p\n", &s1, &s1.Si, &s2, &s2.Si)
 	//fmt.Println("row:", container.Row(0))
 	//fmt.Printf("s2-0: %d %d\n", len(s2.Si), cap(s2.Si))
@@ -554,7 +556,7 @@ func TestStringSliceArray(t *testing.T) {
 	//fmt.Println("s1:", s1)
 	c := parse(s1)
 
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
+	buf, _ := c.marshal(&s1)
 	//fmt.Println("rows: ", c.Row(0))
 
 	c.unmarshal(buf, &s2)
@@ -647,7 +649,7 @@ func TestParse(t *testing.T) {
 	var s2 []int
 
 	f := parse(s)
-	b, _ := f.marshal(&s, make([]byte, 0, 2048))
+	b, _ := f.marshal(&s)
 
 	f.unmarshal(b, &s2)
 
@@ -663,7 +665,7 @@ type stx struct {
 
 func testBody[T comparable](in T, t *testing.T) {
 	ti := parse(in)
-	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&in))
 	fmt.Println("TestTssdInt buf:", dest)
 
 	//ti.print(dest)
@@ -690,7 +692,7 @@ func equalSlice[T comparable](a, b []T) bool {
 
 func testArray[T comparable](in []T, t *testing.T) {
 	ti := parse(in)
-	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&in))
 	fmt.Println("testMergeArray buf:", dest)
 
 	var out []T
@@ -769,7 +771,7 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 
 	ti := parse(st[T]{})
 	fn := func(stin *st[T]) {
-		dest, _ := ti.marshal(Ptr(stin), make([]byte, 0, 2048))
+		dest, _ := ti.marshal(Ptr(stin))
 		var out st[T]
 		ti.unmarshal(dest, Ptr(&out))
 		if stin.Value != out.Value || !equalSlice(stin.Slice, out.Slice) {
@@ -789,14 +791,14 @@ func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
 	//fmt.Println("testBasicInMap:", in[0], in[1])
 	for i := range in {
 		m[in[i]] = in2[i]
-		dest, err := ti.marshal(Ptr(&m), make([]byte, 0, 2048))
+		dest, err := ti.marshal(Ptr(&m))
 		if err != nil {
 			t.Error("testBasicInMap marshal failed")
 		}
 		//fmt.Println("testBasicInMap in[i]:", in[i], in2[i], len(dest))
 
 		var out map[T]V
-		_, err = ti.unmarshal(dest, Ptr(&out))
+		err = ti.unmarshal(dest, Ptr(&out))
 		if err != nil || !reflect.DeepEqual(m, out) {
 			t.Error("testBasicInMap failed")
 		}
@@ -874,29 +876,6 @@ func makeCompost2Array[T comparable](in []T) []compost2[T] {
 	return ret
 }
 
-func randBytes(n int) []byte {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ret := make([]byte, 0, n)
-	for i := 0; i < n; i++ {
-		ret = append(ret, uint8(r.Intn(255)))
-	}
-	return ret
-}
-
-const (
-	minUint32 = uint32(0)
-	maxUint32 = ^uint32(0)
-
-	minUint64 = uint64(0)
-	maxUint64 = ^uint64(0)
-
-	minInt32 = int32(-maxInt32 - 1)
-	maxInt32 = int32(maxUint32 >> 1)
-
-	minInt64 = int64(-maxInt64 - 1)
-	maxInt64 = int64(maxUint64 >> 1)
-)
-
 func (this *AllBasicType) rand() {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -921,7 +900,7 @@ func TestAllBasicTypeInStruct(t *testing.T) {
 
 	(&in).rand()
 
-	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&in))
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
 	ti.unmarshal(dest, Ptr(&out))
@@ -939,7 +918,7 @@ func TestAllBasicTypeInStructArray(t *testing.T) {
 		(&in[i]).rand()
 	}
 
-	dest, _ := ti.marshal(Ptr(&in[0]), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&in[0]))
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
 	ti.unmarshal(dest, Ptr(&out))
@@ -964,10 +943,11 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 
 	fmt.Println("TestAllBasicTypeInStructSlice len:", len(in), " sizeof:", unsafe.Sizeof(in[0]))
 
-	dest, _ := ti.marshal(Ptr(&in), make([]byte, 0, 2048))
+	buf := &Buffer{}
+	ti.marshalTo(Ptr(&in), buf)
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
-	ti.unmarshal(dest, Ptr(&out))
+	ti.unmarshal(buf, Ptr(&out))
 	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
 	if !reflect.DeepEqual(in, out) {
 		t.Error("TestAllBasicTypeInStructSlice unmarshal failed")
@@ -978,12 +958,12 @@ func TestTssdArray(t *testing.T) {
 	var array = [4]int16{1, 2, 3, 4}
 	ti := parse(array)
 
-	dest, _ := ti.marshal(Ptr(&array), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&array))
 
 	fmt.Println("TestTssdArray2 buf:", dest)
 
 	var j [4]int16
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 
 	fmt.Println("unmarshal array j:", array, j, err, cap(j))
 
@@ -998,12 +978,13 @@ func TestTssdSlice(t *testing.T) {
 	}
 	ti := parse(array)
 
-	dest, _ := ti.marshal(Ptr(&array), make([]byte, 0, 2048))
-	ti.print(dest)
+	dest, _ := ti.marshal(Ptr(&array))
+	fmt.Println("TestTssdSlice:", dest)
+	ti.print(*dest)
 
 	var j []int64
-	_, err := ti.unmarshal(dest, Ptr(&j))
-	fmt.Println("unmarshal slice j:", array, j, err)
+	err := ti.unmarshal(dest, Ptr(&j))
+	fmt.Println("unmarshal slice j:", array, j, err, dest)
 	if err != nil || !reflect.DeepEqual(array, j) {
 		t.Error("unmarsha slice failed")
 	}
@@ -1015,11 +996,11 @@ func TestTssdStringSlice(t *testing.T) {
 	array = append(array, "hello")
 	array = append(array, "world")
 
-	dest, _ := ti.marshal(Ptr(&array), make([]byte, 0, 2048))
-	ti.print(dest)
+	dest, _ := ti.marshal(Ptr(&array))
+	ti.print(*dest)
 
 	var j []string
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdStringSlice j:", array, j, err)
 	if err != nil || !reflect.DeepEqual(array, j) {
 		t.Error("unmarsha TestTssdStringSlice failed")
@@ -1033,14 +1014,14 @@ func TestTssdMap(t *testing.T) {
 	}
 	ti := parse(mp)
 
-	dest, _ := ti.marshal(Ptr(&mp), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&mp))
 
 	fmt.Println("TestTssdMap buf2:", dest)
-	ti.print(dest)
+	ti.print(*dest)
 
 	var j map[string]int32
 
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal map j:", mp, j, err)
 	if err != nil || !reflect.DeepEqual(mp, j) {
 		t.Error("unmarsha map failed")
@@ -1062,13 +1043,13 @@ func TestTssdMapStructSlice(t *testing.T) {
 		"foooooo": {789, "barrr"},
 	})
 
-	dest, _ := ti.marshal(Ptr(&mp), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&mp))
 
 	fmt.Println("TestTssdMapStruct buf2:", dest)
 
 	var j []map[string]stx
 
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
 	if err != nil || !reflect.DeepEqual(mp, j) {
 		t.Error("unmarsha TestTssdMapStruct failed")
@@ -1083,13 +1064,13 @@ func TestTssdMapSliceValue(t *testing.T) {
 
 	ti := parse(mp)
 
-	dest, _ := ti.marshal(Ptr(&mp), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&mp))
 
 	fmt.Println("TestTssdMapStruct buf2:", dest)
 
 	var j map[string][]string
 
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
 	if err != nil || !reflect.DeepEqual(mp, j) {
 		t.Error("unmarsha TestTssdMapStruct failed")
@@ -1104,13 +1085,13 @@ func TestTssdPrint(t *testing.T) {
 	}
 	ti := parse(stx{})
 
-	dest, _ := ti.marshal(Ptr(&s), make([]byte, 0, 2048))
+	dest, _ := ti.marshal(Ptr(&s))
 
 	fmt.Println("===============TestTssdPrint===========================")
-	ti.print(dest)
+	ti.print(*dest)
 
 	var j stx
-	_, err := ti.unmarshal(dest, Ptr(&j))
+	err := ti.unmarshal(dest, Ptr(&j))
 	if err != nil || j != s {
 		t.Error("unmarshal struct failed:", s, j, err)
 	}

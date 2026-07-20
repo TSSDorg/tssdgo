@@ -10,10 +10,6 @@ import (
 //this file test for a complex object Student
 
 
-type Equaler interface {
-	Equal(Equaler) bool
-}
-
 type Course struct {
 	Name string
 	TestTime time.Time
@@ -31,7 +27,7 @@ type School struct {
 }
 
 func (this *School)Equal(other *School) bool {
-	return this.Name == other.Name && SliceEqual(this.Camp, other.Camp) && 
+	return this.Name == other.Name && tssd.SliceEqual(this.Camp, other.Camp) && 
 	this.EntryLeaveTime[0].Equal(other.EntryLeaveTime[0]) && this.EntryLeaveTime[1].Equal(other.EntryLeaveTime[1]) 
 }
 
@@ -60,41 +56,6 @@ func (this *Student) Group() string {
 	return STUDENT_GROUP
 }
 
-func SliceEqual[T comparable](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func SliceEqual2[T Equaler](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i].Equal(b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k,v := range a {
-		if !v.Equal(b[k]){
-			return false
-		}
-	}
-	return true
-}
 
 func (this *Student) Equal(other *Student) bool {
 	ret := this.ID == other.ID && this.Age == other.Age && this.Value == other.Value && this.IsMale == other.IsMale && this.Birth.Equal(other.Birth) && this.Mail == other.Mail
@@ -103,11 +64,11 @@ func (this *Student) Equal(other *Student) bool {
 		return false
 	}
 
-	if !SliceEqual(this.Levels, other.Levels) {
+	if !tssd.SliceEqual(this.Levels, other.Levels) {
 		return false
 	}
 
-	if !SliceEqual(this.Address[:], other.Address[:]) {
+	if !tssd.SliceEqual(this.Address[:], other.Address[:]) {
 		return false
 	}
 	fmt.Println("student Equal 1")
@@ -162,31 +123,57 @@ func TestStudent(t *testing.T) {
 
 	tssd.Register(&v)
 
-	n, _ := tssd.Marshal(&v)
+	n := &tssd.Buffer {
+		MTU: 100,
+	}
 
-	if len(n) == 0 {
+	tssd.MarshalTo(&v, n)
+
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	tssd.Print(&v, n)
+	tssd.Print(&v, *n)
+	fmt.Println("fragments:", len(n.Fragments))
 
 	var v2 Student
-	tssd.UnmarshalTo(n, &v2)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
 	fmt.Println("-----v:", v)
-	fmt.Println("-----v2:", v2)
+	
 	if !v.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
 
-	
+	beforeMTU, beforeLen :=  n.MTU, len(n.Fragments)
+	n.Split(378) //do nothing when split large
+	if beforeMTU != n.MTU || beforeLen != len(n.Fragments) {
+		t.Error("TestStudent split large MTU should do nothing")
+	}
+
+	n.Merge()
+	var v4 Student
+	tssd.UnmarshalTo(n, &v4)
+	fmt.Println("-----v4:", v4)
+	if !v.Equal(&v4) {
+		t.Error("TestStruct student merge failed")
+	}
+
+	n.Rewind().Split(378)
+	var v5 Student
+	tssd.UnmarshalTo(n, &v5)
+	fmt.Println("-----v5:", v5, len(n.Fragments), n.MTU)
+	if !v.Equal(&v5) {
+		t.Error("TestStruct student split failed")
+	}
+
 	n, _ = tssd.Marshal(&v2)
-	if len(n) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
 	var v3 Student
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v3)
 	if !v3.Equal(&v) {
 		t.Error("TestStruct student failed")
 	}
@@ -194,11 +181,11 @@ func TestStudent(t *testing.T) {
 	v2.Address = v2.Address[:0]
 
 	n, _ = tssd.Marshal(&v2)
-	if len(n) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th 2 failed")
 	}
 
-	tssd.UnmarshalTo(n, &v3)
+	tssd.UnmarshalTo(tssd.Pipe(n), &v3)
 	if !v3.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
@@ -227,13 +214,13 @@ func TestPrintMap(t *testing.T) {
 	
 	tssd.Register(&s1)
 
-	n, _ := tssd.MarshalTo(&s1, make([]byte, 0, 2048))
+	n, _ := tssd.Marshal(&s1)
 
-	if len(n) == 0 {
+	if len(n.Fragments[0].Data) == 0 {
 		t.Error("TestStruct return row-th failed")
 	}
 
-	tssd.Print(&s1, n)
+	tssd.Print(&s1, *n)
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
 
 	out := []byte{112, 104, 105, 115, 105,}
@@ -242,7 +229,7 @@ func TestPrintMap(t *testing.T) {
 
 	var sout student
 	
-	tssd.UnmarshalTo(n, &sout)
+	tssd.UnmarshalTo(tssd.Pipe(n), &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)
 }

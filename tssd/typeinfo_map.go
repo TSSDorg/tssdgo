@@ -17,7 +17,7 @@ func uintSrcAddr(value reflect.Value) Ptr {
 	return Ptr(&s)
 }
 
-var simpleSave map[reflect.Kind]srcAddr = map[reflect.Kind]srcAddr{
+var simpleSave = map[reflect.Kind]srcAddr{
 	reflect.Bool: func(value reflect.Value) Ptr {
 		s := value.Bool()
 		return Ptr(&s)
@@ -79,227 +79,214 @@ var simpleDump map[reflect.Kind]destAddr = map[reflect.Kind]destAddr{
 	},
 }
 
-func (ti *typeInfo) mapSimpleSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapSimpleSave(value reflect.Value, buf *Buffer) error {
 	s := simpleSave[ti.rtype.Kind()](value)
-	return ti.memAppend(s, dest)
+	return ti.memAppend(s, buf)
 }
 
-func (ti *typeInfo) mapSimpleDump(src []byte) (reflect.Value, []byte, error) {
+func (ti *typeInfo) mapSimpleDump(buf *Buffer) (reflect.Value, error) {
 	d := simpleDump[ti.rtype.Kind()]()
-	src, _ = ti.dump(ti, src, d)
-	return reflect.NewAt(ti.rtype, d).Elem(), src, nil
+	err := ti.dump(ti, buf, d)
+	return reflect.NewAt(ti.rtype, d).Elem(), err
 }
 
-func (ti *typeInfo) mapStrSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapStrSave(value reflect.Value, buf *Buffer) error {
 	s := value.String()
-	return ti.strSave(Ptr(&s), dest)
+	return ti.strSave(Ptr(&s), buf)
 }
 
-func (ti *typeInfo) mapStrDump(src []byte) (reflect.Value, []byte, error) {
+func (ti *typeInfo) mapStrDump(buf *Buffer) (reflect.Value, error) {
 	var s string
-
-	src, _ = ti.strDump(src, Ptr(&s))
-	return reflect.ValueOf(s), src, nil
+	err := ti.strDump(buf, Ptr(&s))
+	return reflect.ValueOf(s), err
 }
 
-func (ti *typeInfo) mapTimeSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapTimeSave(value reflect.Value, buf *Buffer) error {
 	s := value.Interface().(time.Time)
-	return ti.timeSave(Ptr(&s), dest)
+	return ti.timeSave(Ptr(&s), buf)
 }
 
-func (ti *typeInfo) mapTimeDump(src []byte) (reflect.Value, []byte, error) {
+func (ti *typeInfo) mapTimeDump(buf *Buffer) (reflect.Value, error) {
 	var s time.Time
-
-	src, _ = ti.timeDump(src, Ptr(&s))
-	return reflect.ValueOf(s), src, nil
+	err := ti.timeDump(buf, Ptr(&s))
+	return reflect.ValueOf(s), err
 }
 
-func (ti *typeInfo) mapStructSave(value reflect.Value, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)            //reserved total Size (S)
-	dest = appendSize2(dest, len(ti.info)) //S
+func (ti *typeInfo) mapStructSave(value reflect.Value, buf *Buffer) error {
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(ti.info))
 	for i := range len(ti.info) {
-		dest, _ = ti.info[i].mapSave(&ti.info[i], value.Field(i), dest)
+		ti.info[i].mapSave(&ti.info[i], value.Field(i), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
-func (ti *typeInfo) mapStructDump(src []byte) (v reflect.Value, remain []byte, err error) {
-
-	if len(src) < 1 {
-		//TODO, add field name info
-		return v, src, ErrorInSufficientData
+func (ti *typeInfo) mapStructDump(buf *Buffer) (v reflect.Value, err error) {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return v, err
 	}
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, fields, remain, err := checkDumpSize(src)
+		_, fields, err := checkDumpSize(buf)
 		if err != nil {
-			return v, src, ErrorInSufficientData
+			return v, err
 		}
-
 		if fields != len(ti.info) {
-			return v, src, fmt.Errorf("%w [fields mismatch %d %d]", ErrorInvalidTSSDData, len(ti.info), fields)
+			return v, fmt.Errorf("%w [fields mismatch %d %d]", ErrorInvalidTSSDData, fields, len(ti.info))
 		}
 		v = reflect.New(ti.rtype).Elem()
 		var f reflect.Value
 		for i := range fields {
-			f, remain, err = ti.info[i].mapDump(&ti.info[i], remain)
+			f, err = ti.info[i].mapDump(&ti.info[i], buf)
 			if err != nil {
-				return v, src, err
+				return v, err
 			}
 			v.Field(i).Set(f)
 		}
-		return v, remain, nil
-
 	case -ti.Type:
 		//skip this field
-		//TODO return a error when need skip the field
-		return v, src[1:], nil
 	default:
-		return v, src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return v, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return v, nil
 }
 
-func (ti *typeInfo) mapSliceValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapSliceValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(arrayN)
 	for i := range arrayN {
-		dest, _ = ti.info[0].mapSave(&ti.info[0], value.Index(i), dest)
+		ti.info[0].mapSave(&ti.info[0], value.Index(i), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
-func (ti *typeInfo) mapSliceValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
-
-	if len(src) < 1 {
-		//TODO, add field name info
-		return v, src, ErrorInSufficientData
+func (ti *typeInfo) mapSliceValueDump(buf *Buffer) (v reflect.Value, err error) {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return v, err
 	}
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, arrayN, remain, err := checkDumpSize(src)
+		_, arrayN, err := checkDumpSize(buf)
 		if err != nil {
-			return v, src, ErrorInSufficientData
+			return v, err
 		}
 
-		d := reflect.New(ti.rtype).Elem()
+		v = reflect.New(ti.rtype).Elem()
 		if ti.rtype.Kind() == reflect.Slice {
-			d.Grow(arrayN)
-			d.SetLen(arrayN)
+			v.Grow(arrayN)
+			v.SetLen(arrayN)
 		}
 		for i := 0; i < arrayN; i++ {
-			v, remain, err = ti.info[0].mapDump(&ti.info[0], remain)
-			d.Index(i).Set(v)
+			ve, err := ti.info[0].mapDump(&ti.info[0], buf)
+			if err != nil {
+				return v, err
+			}
+			v.Index(i).Set(ve)
 		}
-
-		return d, remain, nil
 	case -ti.Type:
 		//skip this field
-		return v, src[1:], nil
 	default:
-		return v, src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return v, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return v, nil
 }
 
-func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
-
-	dest = append(dest, byte(ti.Type))         //Tarraym
-	dest = append(dest, byte(ti.info[0].Type)) //Telement
-
+	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
 	totalSize := ti.info[0].size * arrayN
-	dest = appendSize4(dest, totalSize) //total Size
-	dest = appendSize2(dest, arrayN)    //S
+	buf.appendSize4(totalSize).appendSize2(arrayN)
 
 	for i := range arrayN {
 		s := simpleSave[ti.info[0].rtype.Kind()](value.Index(i))
-		dest = append(dest, Slice(Ptr(s), Size_t(ti.info[0].size))...)
+		buf.Append(Slice(Ptr(s), Size_t(ti.info[0].size)))
 	}
-	return dest, nil
+	return nil
 }
 
-func (ti *typeInfo) mapMergeSliceValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
-
-	if len(src) < TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return v, src, ErrorInSufficientData
+func (ti *typeInfo) mapMergeSliceValueDump(buf *Buffer) (v reflect.Value, err error) {
+	b, err := buf.Read(make([]byte, 2))
+	if err != nil {
+		return v, err
 	}
-	switch int8(src[0]) {
+	switch int8(b[0]) {
 	case ti.Type: //src[0]:Tarraym, src[1] Telement
-		_, arrayN, remain, err := checkDumpSize(src[TSSD_TYPE_LENGTH:])
+		if int8(b[1]) != ti.info[0].Type {
+			return v, fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[1], ti.info[0].Type)
+		}
+		_, arrayN, err := checkDumpSize(buf)
 		if err != nil {
-			return v, src, ErrorInSufficientData
+			return v, err
 		}
 
-		d := reflect.New(ti.rtype).Elem()
+		v = reflect.New(ti.rtype).Elem()
 		if ti.rtype.Kind() == reflect.Slice {
-			d.Grow(arrayN)
-			d.SetLen(arrayN)
+			v.Grow(arrayN)
+			v.SetLen(arrayN)
 		}
 
 		for i := 0; i < arrayN; i++ {
 			obj := simpleDump[ti.info[0].rtype.Kind()]()
-			copy(Slice(Ptr(obj), Size_t(ti.info[0].size)), remain[:ti.info[0].size])
-			remain = remain[ti.info[0].size:]
-			d.Index(i).Set(reflect.NewAt(ti.info[0].rtype, obj).Elem())
+			buf.Read(Slice(Ptr(obj), Size_t(ti.info[0].size)))
+			v.Index(i).Set(reflect.NewAt(ti.info[0].rtype, obj).Elem())
 		}
-
-		return d, remain, nil
-
 	case -ti.Type:
 		//skip this field
-		return v, src[TSSD_TYPE_LENGTH:], nil
 	default:
-		return v, src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return v, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
 	}
+	return v, nil
 }
 
-func (ti *typeInfo) mapMapValueSave(value reflect.Value, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mapMapValueSave(value reflect.Value, buf *Buffer) error {
 
 	arrayN := value.Len()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
+	index, pos := buf.writePos()
+	size := buf.Size
+
+	buf.appendSize4(0).appendSize2(arrayN)
 
 	keys := value.MapKeys()
 	for _, k := range keys {
 		v := value.MapIndex(k)
-		dest = append(dest, byte(Tdictk))
-		dest, _ = ti.info[0].mapSave(&ti.info[0], k, dest)
-		dest = append(dest, byte(Tdictv))
-		dest, _ = ti.info[1].mapSave(&ti.info[1], v, dest)
+		buf.AppendByte(byte(Tdictk))
+		ti.info[0].mapSave(&ti.info[0], k, buf)
+		buf.AppendByte(byte(Tdictv))
+		ti.info[1].mapSave(&ti.info[1], v, buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
 
-	return dest, nil
+	return nil
 }
 
-func (ti *typeInfo) mapMapValueDump(src []byte) (v reflect.Value, remain []byte, err error) {
-
-	if len(src) < TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return v, src, ErrorInSufficientData
+func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return v, err
 	}
 	//var size int
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, mapLen, remain, err := checkDumpSize(src)
+		_, mapLen, err := checkDumpSize(buf)
 		if err != nil {
-			return v, src, ErrorInSufficientData
+			return v, err
 		}
 
-		mvalue := reflect.MakeMapWithSize(ti.rtype, mapLen)
+		v = reflect.MakeMapWithSize(ti.rtype, mapLen)
 		ktype := ti.rtype.Key()
 		vtype := ti.rtype.Elem()
 
@@ -307,39 +294,42 @@ func (ti *typeInfo) mapMapValueDump(src []byte) (v reflect.Value, remain []byte,
 		for k := 0; k < mapLen; k++ {
 			key := reflect.New(ktype).Elem()
 			value := reflect.New(vtype).Elem()
-
-			if remain[0] != byte(Tdictk) {
-				return v, src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictk, remain[0])
+			b, err = buf.ReadByte()
+			if err != nil {
+				return v, err
+			}
+			if b != byte(Tdictk) {
+				return v, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
 			}
 
-			kk, remain, err = ti.info[0].mapDump(&ti.info[0], remain[TSSD_TYPE_LENGTH:])
+			kk, err = ti.info[0].mapDump(&ti.info[0], buf)
 			if err != nil {
-				return v, src, err
+				return v, err
 			}
 			key.Set(kk.Convert(ktype))
-
-			if remain[0] != byte(Tdictv) {
-				return v, src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictv, remain[0])
+			b, err = buf.ReadByte()
+			if err != nil {
+				return v, err
+			}
+			if b != byte(Tdictv) {
+				return v, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
 			}
 
-			vv, remain, err = ti.info[1].mapDump(&ti.info[1], remain[TSSD_TYPE_LENGTH:])
+			vv, err = ti.info[1].mapDump(&ti.info[1], buf)
 			if err != nil {
-				return v, src, err
+				return v, err
 			}
 			value.Set(vv.Convert(value.Type()))
 
-			mvalue.SetMapIndex(key, value)
+			v.SetMapIndex(key, value)
 		}
-		return mvalue, remain, nil
-
-		//reflect.NewAt(ti.rtype, dest).Elem().Set(mvalue)
-
 	case -ti.Type:
 		//skip this field
-		return v, src[TSSD_TYPE_LENGTH:], nil
+		return v, nil
 	default:
-		return v, src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return v, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return v, nil
 }
 
 func MakeMap(intf interface{}) reflect.Value {

@@ -11,10 +11,10 @@ import (
 
 type Ptr = unsafe.Pointer
 type Size_t = uintptr
-type saveFunc = func(*typeInfo, Ptr, []byte) ([]byte, error)
-type dumpFunc = func(*typeInfo, []byte, Ptr) ([]byte, error)
-type mapSave = func(*typeInfo, reflect.Value, []byte) ([]byte, error) //map save func
-type mapDump = func(*typeInfo, []byte) (reflect.Value, []byte, error) //map dump func
+type saveFunc = func(*typeInfo, Ptr, *Buffer) error
+type dumpFunc = func(*typeInfo, *Buffer, Ptr) error
+type mapSave = func(*typeInfo, reflect.Value, *Buffer) error   //map save func
+type mapDump = func(*typeInfo, *Buffer) (reflect.Value, error) //map dump func
 
 type typeInfo struct {
 	rtype         reflect.Type
@@ -40,202 +40,201 @@ func Slice(k Ptr, size Size_t) []byte {
 }
 
 func appendSize2(dest []byte, le int) []byte {
-	l := uint16(le)
+	l := int16(le)
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
-}
-
-func dumpSize2(src []byte) (size int) {
-	copy(Slice(Ptr(&size), TSSD_SIZEA_LENGTH), src)
-	return size
 }
 
 func appendSize4(dest []byte, le int) []byte {
-	l := uint32(le)
+	l := int32(le)
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
 }
 
-func dumpSize4(src []byte) (size int) {
-	copy(Slice(Ptr(&size), TSSD_SIZET_LENGTH), src)
-	return size
+func dumpSize2(buf *Buffer) (int, error) {
+	var size int16
+	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZEA_LENGTH))
+	return int(size), err
+}
+
+func dumpSize4(buf *Buffer) (int, error) {
+	var size int32
+	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZET_LENGTH))
+	return int(size), err
 }
 
 // check and dump sizet
-func checkDumpSizet(src []byte) (sizet int, remain []byte, err error) {
-	if len(src) < TSSD_TYPE_LENGTH+TSSD_SIZET_LENGTH {
-		//TODO, add field name info
-		return 0, src, ErrorInSufficientData
+func checkDumpSizet(buf *Buffer) (sizet int, err error) {
+	if sizet, err = dumpSize4(buf); err != nil {
+		return 0, err
 	}
-	sizet = dumpSize4(src[TSSD_TYPE_LENGTH:])
-	if len(src) < TSSD_TYPE_LENGTH+TSSD_SIZET_LENGTH+sizet {
+	if buf.Size < sizet {
 		//TODO, add field name info
-		return 0, src, ErrorInSufficientData
+		return 0, ErrorInSufficientData
 	}
-
-	return sizet, src[TSSD_TYPE_LENGTH+TSSD_SIZET_LENGTH:], nil
+	return sizet, nil
 }
 
 // check and dump sizet, sizea
-func checkDumpSize(src []byte) (sizet int, sizea int, remain []byte, err error) {
-	if sizet, remain, err = checkDumpSizet(src); err != nil {
+func checkDumpSize(buf *Buffer) (sizet int, sizea int, err error) {
+	if sizet, err = checkDumpSizet(buf); err != nil {
 		return
 	}
 	//we have check total size in checkDumpSizet, so dump sizea directly
-	sizea = dumpSize2(remain)
-
-	return sizet, sizea, remain[TSSD_SIZEA_LENGTH:], nil
+	sizea, err = dumpSize2(buf)
+	return sizet, sizea, err
 }
 
+/*
 func appendString(dest []byte, s string) []byte {
 	return append(appendSize4(dest, len(s)), s...)
-}
+}*/
 
 func (info *typeInfo) types() []byte {
 	return info.stype
 }
 
-func (ti *typeInfo) memAppend(src Ptr, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type))
-	//dest = dest[0:len(dest)+ti.size]
-	return append(dest, Slice(src, Size_t(ti.size))...), nil
-	//copy(dest[len(dest):], Slice(src, Size_t(ti.size)))
-	//return dest, nil
+func (ti *typeInfo) memAppend(src Ptr, buf *Buffer) error {
+	buf.AppendByte(byte(ti.Type)).Append(Slice(src, Size_t(ti.size)))
+	return nil
 }
 
-func (ti *typeInfo) memDump(src []byte, dest Ptr) ([]byte, error) {
-	if len(src) < 1 {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) memDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		if len(src) < 1+ti.size {
+		if buf.Size < ti.size {
 			//TODO, add field name info
-			return src, ErrorInSufficientData
+			return ErrorInSufficientData
 		}
-		copy(Slice(dest, Size_t(ti.size)), src[1:1+ti.size])
+		buf.Read(Slice(dest, Size_t(ti.size)))
 	case -ti.Type:
 		//skip this field
-		return src[TSSD_TYPE_LENGTH:], nil
+		return nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
-	return src[TSSD_TYPE_LENGTH+ti.size:], nil
+	return nil
 }
 
-func (ti *typeInfo) timeSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) timeSave(src Ptr, buf *Buffer) error {
 	p := (*time.Time)(src)
-
-	dest = append(dest, byte(ti.Type))
-	dest = append(dest, byte(Tstring))
-	return appendString(dest, p.Format(time.RFC3339Nano)), nil
+	buf.Append([]byte{byte(ti.Type), byte(Tstring)}).appendString(p.Format(time.RFC3339Nano))
+	return nil
 }
 
-func (ti *typeInfo) timeDump(src []byte, dest Ptr) ([]byte, error) {
-	if len(src) < TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+// dump string directly
+func stringDump(buf *Buffer, dest *string) error {
+	sizet, err := checkDumpSizet(buf)
+	if err != nil {
+		return err
 	}
+	bs, _ := buf.Read(make([]byte, sizet))
+	*dest = string(bs)
+	return nil
+}
 
-	switch int8(src[0]) {
+func (ti *typeInfo) timeDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	switch int8(b) {
 	case ti.Type:
-		if src[TSSD_TYPE_LENGTH] != byte(Tstring) {
-			return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
-		}
-		sizet, remain, err := checkDumpSizet(src[TSSD_TYPE_LENGTH:])
+		b, err = buf.ReadByte()
 		if err != nil {
-			return src, err
+			return err
 		}
-		p := (*time.Time)(dest)
-		rfc3339Str := string(remain[:sizet])
+		if b != byte(Tstring) {
+			return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, Tstring)
+		}
+		var rfc3339Str string
+		if err = stringDump(buf, &rfc3339Str); err != nil {
+			return err
+		}
 		t, err := time.Parse(time.RFC3339Nano, rfc3339Str)
 		if err != nil {
-			return src, err
+			return err
 		}
+		p := (*time.Time)(dest)
 		*p = t
-		return remain[sizet:], nil
 	case -ti.Type:
 		//skip this field
-		return src[TSSD_TYPE_LENGTH:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return nil
 }
 
-func (ti *typeInfo) strSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) strSave(src Ptr, buf *Buffer) error {
 	p := (*string)(src)
-
-	dest = append(dest, byte(ti.Type))
-	return appendString(dest, *p), nil
+	buf.AppendByte(byte(ti.Type)).appendString(*p)
+	return nil
 }
 
-func (ti *typeInfo) strDump(src []byte, dest Ptr) ([]byte, error) {
-	if len(src) < TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) strDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		sizet, remain, err := checkDumpSizet(src)
-		if err != nil {
-			return src, ErrorInSufficientData
+		if err = stringDump(buf, (*string)(dest)); err != nil {
+			return err
 		}
-		p := (*string)(dest)
-		*p = string(remain[:sizet])
-		return remain[sizet:], nil
 	case -ti.Type:
 		//skip this field
-		return src[TSSD_TYPE_LENGTH:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return nil
 }
 
-func (ti *typeInfo) objSave(src Ptr, dest []byte) ([]byte, error) {
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)            //reserved total Size (S)
-	dest = appendSize2(dest, len(ti.info)) //S
+func (ti *typeInfo) objSave(src Ptr, buf *Buffer) error {
+
+	buf.AppendByte(byte(ti.Type))
+
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(ti.info))
 	for i := range len(ti.info) {
-		dest, _ = ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), dest)
+		ti.info[i].save(&ti.info[i], Ptr(Size_t(src)+ti.info[i].offset), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
-func (ti *typeInfo) objDump(src []byte, dest Ptr) (remain []byte, err error) {
-	if len(src) < TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) objDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, fields, remain, err := checkDumpSize(src)
+		_, fields, err := checkDumpSize(buf)
 		if err != nil {
-			return src, ErrorInSufficientData
+			return err
 		}
 
 		if fields != len(ti.info) {
-			return src, fmt.Errorf("%w [fields mismatch %d %d]", ErrorInvalidTSSDData, len(ti.info), fields)
+			return fmt.Errorf("%w [fields mismatch %d %d]", ErrorInvalidTSSDData, len(ti.info), fields)
 		}
 
 		for i := range fields {
-			if remain, err = ti.info[i].dump(&ti.info[i], remain, Ptr(Size_t(dest)+ti.info[i].offset)); err != nil {
-				return src, err
+			if err = ti.info[i].dump(&ti.info[i], buf, Ptr(Size_t(dest)+ti.info[i].offset)); err != nil {
+				return err
 			}
 		}
-		return remain, nil
-
 	case -ti.Type:
 		//skip this field
-		return src[TSSD_TYPE_LENGTH:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return nil
 }
 
-func (ti *typeInfo) sliceSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) sliceSave(src Ptr, buf *Buffer) error {
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
@@ -245,29 +244,29 @@ func (ti *typeInfo) sliceSave(src Ptr, dest []byte) ([]byte, error) {
 		}
 	}
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)      //reserved total Size (S)
-	dest = appendSize2(dest, arrayN) //S
+	buf.AppendByte(byte(ti.Type))
 
+	index, pos := buf.writePos()
+	size := buf.Size
+
+	buf.appendSize4(0).appendSize2(arrayN)
 	for i := range arrayN {
-		dest, _ = ti.info[0].save(&ti.info[0], Ptr(addr+Size_t(ti.info[0].size*i)), dest)
+		ti.info[0].save(&ti.info[0], Ptr(addr+Size_t(ti.info[0].size*i)), buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
-func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
-	if len(src) < TSSD_TYPE_LENGTH {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) sliceDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, arrayN, remain, err := checkDumpSize(src)
+		_, arrayN, err := checkDumpSize(buf)
 		if err != nil {
-			return src, ErrorInSufficientData
+			return err
 		}
 
 		addr := dest
@@ -284,22 +283,20 @@ func (ti *typeInfo) sliceDump(src []byte, dest Ptr) (remain []byte, err error) {
 		}
 
 		for i := range arrayN {
-			if remain, err = ti.info[0].dump(&ti.info[0], remain, Ptr(Size_t(addr)+Size_t(ti.info[0].size*i))); err != nil {
-				return src, err
+			if err = ti.info[0].dump(&ti.info[0], buf, Ptr(Size_t(addr)+Size_t(ti.info[0].size*i))); err != nil {
+				return err
 			}
 		}
-		return remain, nil
-
 	case -ti.Type:
 		//skip this field
-		return src[1:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return nil
 }
 
 // [Tarraym][Ttype][size][arrayN][data]
-func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) mergeSliceSave(src Ptr, buf *Buffer) error {
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
@@ -309,30 +306,28 @@ func (ti *typeInfo) mergeSliceSave(src Ptr, dest []byte) ([]byte, error) {
 		}
 	}
 
-	dest = append(dest, byte(ti.Type))         //T
-	dest = append(dest, byte(ti.info[0].Type)) // we add a element data type after T
-
+	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
 	totalSize := ti.info[0].size * arrayN
-	dest = appendSize4(dest, 2+totalSize) //arrayN  + total Size
-	dest = appendSize2(dest, arrayN)      //S
+	buf.appendSize4(TSSD_SIZEA_LENGTH + totalSize).appendSize2(arrayN)
 
-	//TODO, for big-endian, we need copy one by one
-	return append(dest, Slice(Ptr(addr), Size_t(totalSize))...), nil
+	buf.Append(Slice(Ptr(addr), Size_t(totalSize)))
+	return nil
 }
 
-func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err error) {
-	if len(src) < 1 {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.Read(make([]byte, 2))
+	if err != nil {
+		return err
 	}
-	var sizet, arrayN int
-	switch int8(src[0]) {
+	switch int8(b[0]) {
 	case ti.Type: //[0]: Tarraym, [1]: elementType
-		sizet, arrayN, remain, err = checkDumpSize(src[1:])
-		if err != nil {
-			return src, ErrorInSufficientData
+		if int8(b[1]) != ti.info[0].Type {
+			return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[1], ti.info[0].Type)
 		}
-
+		_, arrayN, err := checkDumpSize(buf)
+		if err != nil {
+			return err
+		}
 		addr := dest
 		if ti.rtype.Kind() == reflect.Slice {
 			p := (*[]byte)(dest)
@@ -347,51 +342,47 @@ func (ti *typeInfo) mergeSliceDump(src []byte, dest Ptr) (remain []byte, err err
 		}
 
 		//TODO, for big-endian, we need copy one by one
-		copy(Slice(addr, Size_t(arrayN*ti.info[0].size)), remain)
-
+		buf.Read(Slice(addr, Size_t(arrayN*ti.info[0].size)))
 	case -ti.Type:
 		//skip this field
-		return src[1:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
 	}
-	return src[TSSD_TYPE_LENGTH+TSSD_TYPE_LENGTH+TSSD_SIZET_LENGTH+sizet:], nil
+	return nil
 }
 
-func (ti *typeInfo) dictSave(src Ptr, dest []byte) ([]byte, error) {
+func (ti *typeInfo) dictSave(src Ptr, buf *Buffer) error {
 
 	value := reflect.NewAt(ti.rtype, src).Elem()
 	keys := value.MapKeys()
 
-	dest = append(dest, byte(ti.Type)) //T
-	sizePos := len(dest)
-	dest = appendSize4(dest, 0)         //reserved total Size (S)
-	dest = appendSize2(dest, len(keys)) //S
+	buf.AppendByte(byte(ti.Type))
+
+	index, pos := buf.writePos()
+	size := buf.Size
+	buf.appendSize4(0).appendSize2(len(keys))
 
 	for _, k := range keys {
 		v := value.MapIndex(k)
-		dest = append(dest, byte(Tdictk))
-		dest, _ = ti.info[0].mapSave(&ti.info[0], k, dest)
-		dest = append(dest, byte(Tdictv))
-		dest, _ = ti.info[1].mapSave(&ti.info[1], v, dest)
+		buf.AppendByte(byte(Tdictk))
+		ti.info[0].mapSave(&ti.info[0], k, buf)
+		buf.AppendByte(byte(Tdictv))
+		ti.info[1].mapSave(&ti.info[1], v, buf)
 	}
-	appendSize4(dest[:sizePos], len(dest)-sizePos-TSSD_SIZET_LENGTH)
-
-	return dest, nil
+	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
+	return nil
 }
 
-func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
-
-	if len(src) < 1 {
-		//TODO, add field name info
-		return src, ErrorInSufficientData
+func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
-
-	switch int8(src[0]) {
+	switch int8(b) {
 	case ti.Type:
-		_, mapLen, remain, err := checkDumpSize(src)
+		_, mapLen, err := checkDumpSize(buf)
 		if err != nil {
-			return src, ErrorInSufficientData
+			return err
 		}
 
 		mvalue := reflect.MakeMapWithSize(ti.rtype, mapLen)
@@ -402,53 +393,66 @@ func (ti *typeInfo) dictDump(src []byte, dest Ptr) (remain []byte, err error) {
 		for k := 0; k < mapLen; k++ {
 			key := reflect.New(ktype).Elem()
 			value := reflect.New(vtype).Elem()
-			if remain[0] != byte(Tdictk) {
-				return src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictk, remain[0])
+			b, err = buf.ReadByte()
+			if err != nil {
+				return err
+			}
+			if b != byte(Tdictk) {
+				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
 			}
 
-			kk, remain, err = ti.info[0].mapDump(&ti.info[0], remain[TSSD_TYPE_LENGTH:])
+			kk, err = ti.info[0].mapDump(&ti.info[0], buf)
 			if err != nil {
-				return src, err
+				return err
 			}
 			key.Set(kk.Convert(ktype))
 
-			if remain[0] != byte(Tdictv) {
-				return src, fmt.Errorf("%w [field type mismatch: expect %d but %d", ErrorInvalidTSSDData, Tdictv, remain[0])
+			b, err = buf.ReadByte()
+			if err != nil {
+				return err
+			}
+			if b != byte(Tdictv) {
+				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
 			}
 
-			vv, remain, err = ti.info[1].mapDump(&ti.info[1], remain[TSSD_TYPE_LENGTH:])
+			vv, err = ti.info[1].mapDump(&ti.info[1], buf)
 			if err != nil {
-				return src, err
+				return err
 			}
 			value.Set(vv.Convert(value.Type()))
 
 			mvalue.SetMapIndex(key, value)
 		}
 		reflect.NewAt(ti.rtype, dest).Elem().Set(mvalue)
-		return remain, nil
 	case -ti.Type:
 		//skip this field
-		return src[1:], nil
 	default:
-		return src, fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, src[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
+	return nil
 }
 
-func (ti *typeInfo) marshal(src any, dest []byte) ([]byte, error) {
+func (ti *typeInfo) marshal(src any) (*Buffer, error) {
+	buf := &Buffer{}
+	err := ti.marshalTo(src, buf)
+	return buf, err
+}
+
+func (ti *typeInfo) marshalTo(src any, buf *Buffer) error {
 	value := reflect.ValueOf(src)
 	obj := value.Pointer()
 
-	return ti.save(ti, Ptr(obj), dest)
+	return ti.save(ti, Ptr(obj), buf)
 }
 
-func (ti *typeInfo) unmarshal(src []byte, dest any) ([]byte, error) {
-	return ti.unmarshalTo(src, dest)
+func (ti *typeInfo) unmarshal(buf *Buffer, dest any) error {
+	return ti.unmarshalTo(buf, dest)
 }
 
-func (ti *typeInfo) unmarshalTo(src []byte, dest any) ([]byte, error) {
+func (ti *typeInfo) unmarshalTo(buf *Buffer, dest any) error {
 	value := reflect.ValueOf(dest)
 	obj := value.Pointer()
-	return ti.dump(ti, src, Ptr(obj))
+	return ti.dump(ti, buf, Ptr(obj))
 }
 
 func toTSSDType(kind reflect.Kind) (typee int8) {
