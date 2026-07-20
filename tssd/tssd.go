@@ -46,7 +46,6 @@ const (
 	Tdict           //map, pairs of (key, value)
 	Tdictk          //key of a map node
 	Tdictv          //value of a map node
-	Tdata           //TSSD data, it can be unmarshaled into Flatable object
 	Traw            //raw binary data
 	Tschema  = 77   //'M' schema meta data string
 	Theader  = 84   //'T' tssd header
