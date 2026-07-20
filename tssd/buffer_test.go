@@ -111,7 +111,7 @@ func TestAppendBuffer3(t *testing.T) {
 func TestAppendBufferWithUserBuffer(t *testing.T) {
 	d1 := make([]byte, 2, 2)
 	d2 := make([]byte, 1, 1)
-	d3 := make([]byte, 3, 3)
+	d3 := make([]byte, 3, 4)
 	buf := &Buffer{
 		MTU: 3,
 		Fragments: []Fragment{
@@ -127,13 +127,18 @@ func TestAppendBufferWithUserBuffer(t *testing.T) {
 	}
 
 	buf.Append(dest[:])
-	if !SliceSliceEqual(getData(buf), [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105}, []byte{106, 107, 108}, []byte{109, 110}}) {
+	if !SliceSliceEqual(getData(buf), [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105, 106}, []byte{107, 108, 109}, []byte{110}}) {
 		t.Error("Buffer append r1 err:", getData(buf))
 	}
-	buf.Append(dest[:2])
-	if !SliceSliceEqual(getData(buf), [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105}, []byte{106, 107, 108}, []byte{109, 110, 100}, []byte{101}}) {
+	buf.Append(dest[:3])
+	if !SliceSliceEqual(getData(buf), [][]byte{[]byte{100, 101}, []byte{102}, []byte{103, 104, 105, 106}, []byte{107, 108, 109}, []byte{110, 100, 101}, []byte{102}}) {
 		t.Error("Buffer append r1 err:", getData(buf))
 	}
+
+	readBuffer3(t, 1, 10, []byte{100}, []byte{101, 102, 103, 104, 105, 106, 107, 108, 109, 110})
+	readBuffer3(t, 2, 9, []byte{100, 101}, []byte{102, 103, 104, 105, 106, 107, 108, 109, 110})
+	readBuffer3(t, 3, 8, []byte{100, 101, 102}, []byte{103, 104, 105, 106, 107, 108, 109, 110})
+	readBuffer3(t, 4, 7, []byte{100, 101, 102, 103}, []byte{104, 105, 106, 107, 108, 109, 110})
 }
 
 func readBuffer3(t *testing.T, first, second int, r1, r2 []byte) {
