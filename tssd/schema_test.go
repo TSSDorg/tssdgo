@@ -2,6 +2,8 @@ package tssd_test
 
 import (
 	//"errors"
+	//"crypto/md5"
+	//"encoding/hex"
 	"fmt"
 	"strconv"
 	"testing"
@@ -10,6 +12,27 @@ import (
 )
 
 //this file demo how to override Flatable.Schema()
+
+func init() {
+	/*
+	tssd.HashFunc = func(data []byte) []byte {
+		hasher := md5.New()
+		hasher.Write(data)                         // Write the data to the hasher
+		hashBytes := hasher.Sum(nil)                // Get the hash sum as a byte slice
+		hashString := hex.EncodeToString(hashBytes) // Convert to a hex string
+		l := len(hashString)
+		return []byte(hashString[:4] + hashString[l-6:l])
+	}
+
+	tssd.ChecksumFunc = func(data []byte) []byte {
+		hasher := md5.New()
+		hasher.Write(data)                         // Write the data to the hasher
+		hashBytes := hasher.Sum(nil)                // Get the hash sum as a byte slice
+		hashString := hex.EncodeToString(hashBytes) // Convert to a hex string
+		l := len(hashString)
+		return []byte(hashString[:5] + hashString[l-8:l])
+	}*/
+}
 
 const WORKER_GROUP_NAME = "work_group_name"
 
@@ -56,7 +79,7 @@ func (this *worker_V2) TID() string {
 func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema{
 		-1,
-		this.Hash(this.Types()),
+		string(tssd.HashFunc(this.Types())),
 		this.TID(),
 		"you can put a json object string",
 	}
@@ -99,13 +122,11 @@ const (
 func (this *worker_V1) Schema() tssd.Schema {
 	return tssd.Schema{
 		-1,
-		this.Hash(this.Types()),
+		string(tssd.HashFunc(this.Types())),
 		this.TID(),
 		SCHEMA_CONTENT,
 	}
 }
-
-//
 
 //test V1->V2
 func TestUnmarshalDecorateWorker(t *testing.T) {
