@@ -43,7 +43,9 @@ func (buf *Buffer) prepare(schema Schema) error {
 		return err
 	}
 	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
-	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - TSSD_CHECKSUM_LENGTH
+	//we will try to calc the real size of Checksum
+	buf.lenChecksum = 8 + len(ChecksumFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
+	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - buf.lenChecksum
 	nbuf.appendSize4(avail) //reserve sizet
 	nbuf.appendSize2(avail)
 	//we will keep a copy of schema in buf.heads
@@ -51,7 +53,6 @@ func (buf *Buffer) prepare(schema Schema) error {
 		return ErrorTSSDHeadOverSizeFragment
 	}
 	buf.heads = nbuf.Fragments[0].Data[:nbuf.Size]
-	buf.lenChecksum = TSSD_CHECKSUM_LENGTH
 	return nil
 }
 
@@ -91,7 +92,7 @@ func (buf *Buffer) finish() {
 }
 
 func (buf *Buffer) appendChecksum(index int) {
-	checksum := hash(buf.Fragments[index].Raw)
+	checksum := ChecksumFunc(buf.Fragments[index].Raw)
 	//exclude all info about checksum
 	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tarraym))
 	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tuint8))
@@ -279,7 +280,7 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	buf.Size += len(buf.Fragments[fid-1].Data)
 	if len(buf.heads) == 0 && len(buf.Fragments[0].Raw) > len(buf.Fragments[0].Data) {
 		buf.heads = buf.Fragments[0].Raw[0 : len(buf.Fragments[0].Raw)-len(buf.Fragments[0].Data)]
-		buf.lenChecksum = TSSD_CHECKSUM_LENGTH
+		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	}
 
 	if miss = buf.Wanted(); miss != 0 {
@@ -320,7 +321,7 @@ func (buf *Buffer) Merge() *Buffer {
 		},
 	}
 	frag := &buf.Fragments[0] //new one
-	headLen := len(frags[0].Raw) - TSSD_CHECKSUM_LENGTH - len(frags[0].Data)
+	headLen := len(frags[0].Raw) - buf.lenChecksum - len(frags[0].Data)
 	frag.Raw = append(frag.Raw, frags[0].Raw[:headLen]...)
 	frag.Data = frag.Raw[headLen:headLen]
 	buf.Size = 0

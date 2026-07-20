@@ -39,9 +39,6 @@ type Flatable interface {
 	//to produce a flatable object
 	Build() Flatable
 
-	//digest algo, default is the md5sum, you can override it
-	Hash([]byte) string
-
 	//schema write in the TSSD header
 	//but you need override OnHeader to receive it
 	Schema() Schema
@@ -101,14 +98,11 @@ func (this *Flat[T, PT]) Types() []byte {
 	return groups[g].versions[version].info.types()
 }
 
-func (this *Flat[T, PT]) Hash(types []byte) string {
-	return string(hash(types))
-}
 
 func (this *Flat[T, PT]) Schema() Schema {
 	return Schema{
 		-1,
-		this.Hash(this.Types()),
+		string(HashFunc(this.Types())),
 		this.TID(),
 		this.Extent(),
 	}

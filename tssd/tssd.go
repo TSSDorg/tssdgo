@@ -9,18 +9,16 @@ import (
 )
 
 const (
-	MAGIC                = "TSSDV"
-	TSSD_VERSION_MINOR   = 1
-	TSSD_VERSION_MAJOR   = 0
-	TSSD_FLAT_KIND       = "tssd.Flat"
-	TSSD_TIME_KIND       = "time.Time"
-	TSSD_TYPE_LENGTH     = 1
-	TSSD_SIZET_LENGTH    = 4
-	TSSD_SIZEA_LENGTH    = 2
-	TSSD_BUFFER_MIN_MTU  = 256
-	TSSD_BUFFER_MTU      = 3072
-	TSSD_HASH_HALF_SIZE  = 6 //actually size means *2
-	TSSD_CHECKSUM_LENGTH = TSSD_TYPE_LENGTH + TSSD_TYPE_LENGTH + TSSD_SIZET_LENGTH + TSSD_SIZEA_LENGTH + TSSD_HASH_HALF_SIZE + TSSD_HASH_HALF_SIZE
+	MAGIC               = "TSSDV"
+	TSSD_VERSION_MINOR  = 1
+	TSSD_VERSION_MAJOR  = 0
+	TSSD_FLAT_KIND      = "tssd.Flat"
+	TSSD_TIME_KIND      = "time.Time"
+	TSSD_TYPE_LENGTH    = 1
+	TSSD_SIZET_LENGTH   = 4
+	TSSD_SIZEA_LENGTH   = 2
+	TSSD_BUFFER_MIN_MTU = 256
+	TSSD_BUFFER_MTU     = 3072
 )
 
 type Ttype int8
@@ -95,7 +93,11 @@ type Fragment struct {
 	Raw      []byte //raw data including fragment header, TSSD content, Checksum
 }
 
+var HashFunc func([]byte) []byte = hash
+var ChecksumFunc func([]byte) []byte = hash
+
 func hash(types []byte) []byte {
+	const TSSD_HASH_HALF_SIZE = 6
 	hasher := md5.New()
 	hasher.Write(types)                         // Write the data to the hasher
 	hashBytes := hasher.Sum(nil)                // Get the hash sum as a byte slice
@@ -170,7 +172,8 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 }
 
 func (frag *Fragment) Validate(input []byte) error {
-	if string(hash(input)) != string(frag.Checksum) {
+	// if frag.Checksum is empty, we skip checksum validation
+	if len(frag.Checksum) > 0 && string(ChecksumFunc(input)) != string(frag.Checksum) {
 		return ErrorTSSDDataChecksumFailure
 	}
 	return nil
