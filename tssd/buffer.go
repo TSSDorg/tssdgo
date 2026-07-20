@@ -86,7 +86,7 @@ func (buf *Buffer) finish() {
 	appendSize2(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZEA_LENGTH], length)
 
 	//reset Raw to the real size, we will use Raw to send out
-	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[:pos+length]
+	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[: pos+length]
 
 	//at last we need append checksum when finish(many sizet will update at finish)
 	for i := 0; i <= buf.windex; i++ {
@@ -116,7 +116,7 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			buf.Fragments = append(buf.Fragments,
 				Fragment{
 					Data: b[len(buf.heads):len(buf.heads)],
-					Raw:  b[:buf.MTU-buf.lenChecksum],
+					Raw:  b[:buf.MTU - buf.lenChecksum],
 				})
 			if buf.schema != nil {
 				buf.Fragments[buf.windex].Schema = *buf.schema
@@ -203,7 +203,7 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 }
 
 func (buf *Buffer) appendSize2(le int) *Buffer {
-	l := uint16(le)
+	l := int16(le)
 	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
 }
 

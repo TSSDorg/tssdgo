@@ -876,29 +876,6 @@ func makeCompost2Array[T comparable](in []T) []compost2[T] {
 	return ret
 }
 
-func randBytes(n int) []byte {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	ret := make([]byte, 0, n)
-	for i := 0; i < n; i++ {
-		ret = append(ret, uint8(r.Intn(255)))
-	}
-	return ret
-}
-
-const (
-	minUint32 = uint32(0)
-	maxUint32 = ^uint32(0)
-
-	minUint64 = uint64(0)
-	maxUint64 = ^uint64(0)
-
-	minInt32 = int32(-maxInt32 - 1)
-	maxInt32 = int32(maxUint32 >> 1)
-
-	minInt64 = int64(-maxInt64 - 1)
-	maxInt64 = int64(maxUint64 >> 1)
-)
-
 func (this *AllBasicType) rand() {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
