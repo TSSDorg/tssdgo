@@ -266,7 +266,7 @@ func dumpSize4(buf *Buffer) (int, error) {
 }
 
 // check and dump sizet
-func checkDumpSizet(buf *Buffer) (sizet int, err error) {
+func (buf *Buffer) checkDumpSizet() (sizet int, err error) {
 	if sizet, err = dumpSize4(buf); err != nil {
 		return 0, err
 	}
@@ -278,8 +278,8 @@ func checkDumpSizet(buf *Buffer) (sizet int, err error) {
 }
 
 // check and dump sizet, sizea
-func checkDumpSize(buf *Buffer) (sizet int, sizea int, err error) {
-	if sizet, err = checkDumpSizet(buf); err != nil {
+func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
+	if sizet, err = buf.checkDumpSizet(); err != nil {
 		return
 	}
 	//we have check total size in checkDumpSizet, so dump sizea directly

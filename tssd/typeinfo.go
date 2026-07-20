@@ -70,7 +70,7 @@ func (ti *typeInfo) timeSave(src Ptr, buf *Buffer) error {
 
 // dump string directly
 func stringDump(buf *Buffer, dest *string) error {
-	sizet, err := checkDumpSizet(buf)
+	sizet, err := buf.checkDumpSizet()
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (ti *typeInfo) objDump(buf *Buffer, dest Ptr) error {
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, fields, err := checkDumpSize(buf)
+		_, fields, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (ti *typeInfo) sliceDump(buf *Buffer, dest Ptr) error {
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, arrayN, err := checkDumpSize(buf)
+		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -268,7 +268,7 @@ func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
 		if int8(b[1]) != ti.info[0].Type {
 			return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[1], ti.info[0].Type)
 		}
-		_, arrayN, err := checkDumpSize(buf)
+		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -324,7 +324,7 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, mapLen, err := checkDumpSize(buf)
+		_, mapLen, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
