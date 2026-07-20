@@ -114,6 +114,10 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		node.Content = fmt.Sprintf("%s(%s): %s", info.name, info.rtype.String(), t.Format(time.RFC3339Nano))
 		return nil
 	case Tobject:
+		_, err := buf.ReadByte()
+		if err != nil {
+			return err
+		}
 		sizet, fields, err := checkDumpSize(buf)
 		if err != nil {
 			return err
