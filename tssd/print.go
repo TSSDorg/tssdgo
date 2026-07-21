@@ -118,7 +118,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		if err != nil {
 			return err
 		}
-		sizet, fields, err := checkDumpSize(buf)
+		sizet, fields, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		if err != nil {
 			return err
 		}
-		sizet, arrayN, err := checkDumpSize(buf)
+		sizet, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		if err != nil {
 			return err
 		}
-		sizet, arrayN, err := checkDumpSize(buf)
+		sizet, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (info *typeInfo) parse(parent *Node, buf *Buffer) error {
 		if err != nil {
 			return err
 		}
-		sizet, mapLen, err := checkDumpSize(buf)
+		sizet, mapLen, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
