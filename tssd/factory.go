@@ -70,7 +70,7 @@ func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 		fmt.Printf("remote schema hash[%s] not found(unregisted), local:[%s]\n", remoteHash, local)
 		return ErrorTSSDDataSchemaUnmatch
 	}
-
+	buf.Rewind()
 	if local == remoteHash {
 		return bi.info.unmarshalTo(buf, dest)
 	}
