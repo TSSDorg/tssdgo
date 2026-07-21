@@ -30,7 +30,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 		Fragments: []Fragment{
 			Fragment{
 				tdata: buf.heads,
-				Raw:  buf.heads,
+				Data:  buf.heads,
 			},
 		},
 	}
@@ -82,11 +82,11 @@ func (buf *Buffer) finish() {
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
 	length := len(buf.Fragments[buf.windex].tdata)
-	appendSize4(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
-	appendSize2(buf.Fragments[buf.windex].Raw[:pos-TSSD_SIZEA_LENGTH], length)
+	appendSize4(buf.Fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
+	appendSize2(buf.Fragments[buf.windex].Data[:pos-TSSD_SIZEA_LENGTH], length)
 
-	//reset Raw to the real size, we will use Raw to send out
-	buf.Fragments[buf.windex].Raw = buf.Fragments[buf.windex].Raw[: pos+length]
+	//reset Data to the real size, we will use Data to send out
+	buf.Fragments[buf.windex].Data = buf.Fragments[buf.windex].Data[:pos+length]
 
 	//at last we need append checksum when finish(many sizet will update at finish)
 	for i := 0; i <= buf.windex; i++ {
@@ -95,13 +95,13 @@ func (buf *Buffer) finish() {
 }
 
 func (buf *Buffer) appendChecksum(index int) {
-	checksum := ChecksumFunc(buf.Fragments[index].Raw)
+	checksum := ChecksumFunc(buf.Fragments[index].Data)
 	//exclude all info about checksum
-	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tarraym))
-	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, byte(Tuint8))
-	buf.Fragments[index].Raw = appendSize4(buf.Fragments[index].Raw, len(checksum))
-	buf.Fragments[index].Raw = appendSize2(buf.Fragments[index].Raw, len(checksum))
-	buf.Fragments[index].Raw = append(buf.Fragments[index].Raw, checksum...)
+	buf.Fragments[index].Data = append(buf.Fragments[index].Data, byte(Tarraym))
+	buf.Fragments[index].Data = append(buf.Fragments[index].Data, byte(Tuint8))
+	buf.Fragments[index].Data = appendSize4(buf.Fragments[index].Data, len(checksum))
+	buf.Fragments[index].Data = appendSize2(buf.Fragments[index].Data, len(checksum))
+	buf.Fragments[index].Data = append(buf.Fragments[index].Data, checksum...)
 }
 
 func (buf *Buffer) Append(bs []byte) *Buffer {
@@ -116,7 +116,7 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			buf.Fragments = append(buf.Fragments,
 				Fragment{
 					tdata: b[len(buf.heads):len(buf.heads)],
-					Raw:   b[:buf.MTU - buf.lenChecksum],
+					Data:  b[:buf.MTU-buf.lenChecksum],
 				})
 			if buf.schema != nil {
 				buf.Fragments[buf.windex].Schema = *buf.schema
@@ -232,12 +232,12 @@ func (buf *Buffer) appendString(s string) *Buffer {
 
 // [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet/4B][sizea/2B][FID][...]
 func (buf *Buffer) updateFragmentID(index, n int) {
-	if len(buf.heads) == 0 || len(buf.Fragments[index].Raw) < 17 {
+	if len(buf.heads) == 0 || len(buf.Fragments[index].Data) < 17 {
 		return
 	}
 	l := int16(n)
 	s := Slice(Ptr(&l), unsafe.Sizeof(l))
-	copy(buf.Fragments[index].Raw[16:], s)
+	copy(buf.Fragments[index].Data[16:], s)
 }
 
 func (buf *Buffer) updateSize(index, pos, value int) {
@@ -324,8 +324,8 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	//we always copy it, even repeat push
 	buf.Fragments[fid-1] = *frag
 	buf.Size += len(buf.Fragments[fid-1].tdata)
-	if len(buf.heads) == 0 && len(buf.Fragments[0].Raw) > len(buf.Fragments[0].tdata) {
-		buf.heads = buf.Fragments[0].Raw[0 : len(buf.Fragments[0].Raw)-len(buf.Fragments[0].tdata)]
+	if len(buf.heads) == 0 && len(buf.Fragments[0].Data) > len(buf.Fragments[0].tdata) {
+		buf.heads = buf.Fragments[0].Data[0 : len(buf.Fragments[0].Data)-len(buf.Fragments[0].tdata)]
 		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	}
 
@@ -363,18 +363,18 @@ func (buf *Buffer) Merge() *Buffer {
 		Fragment{
 			Header: frags[0].Header,
 			Schema: frags[0].Schema,
-			Raw:    make([]byte, 0, len(buf.Fragments[0].Raw)-len(buf.Fragments[0].tdata)+buf.Size),
+			Data:   make([]byte, 0, len(buf.Fragments[0].Data)-len(buf.Fragments[0].tdata)+buf.Size),
 		},
 	}
 	frag := &buf.Fragments[0] //new one
-	headLen := len(frags[0].Raw) - buf.lenChecksum - len(frags[0].tdata)
-	frag.Raw = append(frag.Raw, frags[0].Raw[:headLen]...)
-	frag.tdata = frag.Raw[headLen:headLen]
+	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].tdata)
+	frag.Data = append(frag.Data, frags[0].Data[:headLen]...)
+	frag.tdata = frag.Data[headLen:headLen]
 	buf.Size = 0
 	buf.windex = 0
-	buf.MTU = cap(frag.Raw)
+	buf.MTU = cap(frag.Data)
 	if len(buf.heads) == 0 {
-		buf.heads = frag.Raw[0:headLen]
+		buf.heads = frag.Data[0:headLen]
 	}
 
 	for i := 0; i < len(frags); i++ {

@@ -87,7 +87,7 @@ type Fragment struct {
 	Schema
 	tdata    []byte //TSSD content only
 	Checksum []byte //disgest of all the Fragment bytes
-	Raw      []byte //raw data including fragment header, TSSD content, Checksum
+	Data     []byte //raw data including fragment header, TSSD content, Checksum
 }
 
 var HashFunc func([]byte) []byte = hash
@@ -125,7 +125,7 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 		Fragments: []Fragment{
 			Fragment{
 				tdata: data,
-				Raw:   data,
+				Data:  data,
 			},
 		},
 	}
@@ -160,10 +160,10 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err = frag.Validate(needCheck); err != nil {
 		return data, err
 	}
-	frag.Raw = make([]byte, posChecksum+len(frag.Checksum))
-	copy(frag.Raw, data)
-	frag.tdata = frag.Raw[posData : posData+len(frag.tdata)]
-	frag.Checksum = frag.Raw[posChecksum : posChecksum+len(frag.Checksum)]
+	frag.Data = make([]byte, posChecksum+len(frag.Checksum))
+	copy(frag.Data, data)
+	frag.tdata = frag.Data[posData : posData+len(frag.tdata)]
+	frag.Checksum = frag.Data[posChecksum : posChecksum+len(frag.Checksum)]
 
 	return data[posChecksum+len(frag.Checksum):], nil
 }

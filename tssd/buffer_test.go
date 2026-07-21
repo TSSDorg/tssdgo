@@ -115,9 +115,9 @@ func TestAppendBufferWithUserBuffer(t *testing.T) {
 	buf := &Buffer{
 		MTU: 3,
 		Fragments: []Fragment{
-			Fragment{Raw: d1},
-			Fragment{Raw: d2},
-			Fragment{Raw: d3},
+			Fragment{Data: d1},
+			Fragment{Data: d2},
+			Fragment{Data: d3},
 		},
 	}
 
@@ -260,8 +260,8 @@ func TestBufferPushAndWanted(t *testing.T) {
 		t.Fatalf("expected Wanted to report no missing fragments, got %d", got)
 	}
 
-	first := &Fragment{Raw: []byte("hello"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 1}}
-	second := &Fragment{Raw: []byte("world"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 2}}
+	first := &Fragment{Data: []byte("hello"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 1}}
+	second := &Fragment{Data: []byte("world"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 2}}
 
 	miss, err := buf.Push(first)
 	if !errors.Is(err, ErrorInSufficientData) {
@@ -283,7 +283,7 @@ func TestBufferPushAndWanted(t *testing.T) {
 		t.Fatalf("expected Wanted to report no missing fragments, got %d", got)
 	}
 
-	third := &Fragment{Raw: []byte("!"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: -3}}
+	third := &Fragment{Data: []byte("!"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: -3}}
 	miss, err = buf.Push(third)
 	if err != nil || miss != 0 {
 		t.Fatalf("pushing third fragment failed: %v", err)
