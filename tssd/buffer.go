@@ -59,7 +59,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 // reset buf's read info, let user read from begin
 func (buf *Buffer) Rewind() *Buffer {
 	buf.index, buf.pos, buf.Size = 0, 0, 0
-	for i := 0; i <= buf.windex; i++ {
+	for i := 0; i < len(buf.Fragments); i++ {
 		buf.Size += len(buf.Fragments[i].Data)
 	}
 	return buf
