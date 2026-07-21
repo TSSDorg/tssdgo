@@ -202,6 +202,20 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 	return result, nil
 }
 
+// common version append diretly without check data cap
+// call when you need update heads or checksum.
+func appendSize2(dest []byte, le int) []byte {
+	l := int16(le)
+	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
+}
+
+func appendSize4(dest []byte, le int) []byte {
+	l := int32(le)
+	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
+}
+
+// Buffer version append Buffer.Data only with check data cap
+// call when you add new data to the buffer.
 func (buf *Buffer) appendSize2(le int) *Buffer {
 	l := int16(le)
 	return buf.Append(Slice(Ptr(&l), unsafe.Sizeof(l)))
@@ -218,7 +232,7 @@ func (buf *Buffer) appendString(s string) *Buffer {
 
 // [TSSD][Tversion][TSSD_VERSION_MINOR][TSSD_VERSION_MAJOR][Tschema][Tobject][sizet/4B][sizea/2B][FID][...]
 func (buf *Buffer) updateFragmentID(index, n int) {
-	if len(buf.Fragments[index].Raw) < 17 {
+	if len(buf.heads) == 0 || len(buf.Fragments[index].Raw) < 17 {
 		return
 	}
 	l := int16(n)
@@ -237,6 +251,40 @@ func (buf *Buffer) updateSize(index, pos, value int) {
 			index++
 		}
 	}
+}
+
+func (buf *Buffer) dumpSize2() (int, error) {
+	var size int16
+	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZEA_LENGTH))
+	return int(size), err
+}
+
+func (buf *Buffer) dumpSize4() (int, error) {
+	var size int32
+	_, err := buf.Read(Slice(Ptr(&size), TSSD_SIZET_LENGTH))
+	return int(size), err
+}
+
+// check and dump sizet
+func (buf *Buffer) checkDumpSizet() (sizet int, err error) {
+	if sizet, err = buf.dumpSize4(); err != nil {
+		return 0, err
+	}
+	if buf.Size < sizet {
+		//TODO, add field name info
+		return 0, ErrorInSufficientData
+	}
+	return sizet, nil
+}
+
+// check and dump sizet, sizea
+func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
+	if sizet, err = buf.checkDumpSizet(); err != nil {
+		return
+	}
+	//we have check total size in checkDumpSizet, so dump sizea directly
+	sizea, err = buf.dumpSize2()
+	return sizet, sizea, err
 }
 
 // return fragment id with error if lost

@@ -131,7 +131,7 @@ func (ti *typeInfo) mapStructDump(buf *Buffer) (v reflect.Value, err error) {
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, fields, err := checkDumpSize(buf)
+		_, fields, err := buf.checkDumpSize()
 		if err != nil {
 			return v, err
 		}
@@ -177,7 +177,7 @@ func (ti *typeInfo) mapSliceValueDump(buf *Buffer) (v reflect.Value, err error) 
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, arrayN, err := checkDumpSize(buf)
+		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return v, err
 		}
@@ -226,7 +226,7 @@ func (ti *typeInfo) mapMergeSliceValueDump(buf *Buffer) (v reflect.Value, err er
 		if int8(b[1]) != ti.info[0].Type {
 			return v, fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[1], ti.info[0].Type)
 		}
-		_, arrayN, err := checkDumpSize(buf)
+		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return v, err
 		}
@@ -281,7 +281,7 @@ func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
 	//var size int
 	switch int8(b) {
 	case ti.Type:
-		_, mapLen, err := checkDumpSize(buf)
+		_, mapLen, err := buf.checkDumpSize()
 		if err != nil {
 			return v, err
 		}
