@@ -30,8 +30,8 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 	if frag.Schema.Hash != "hash" || frag.Schema.TID != "tid" || frag.Schema.Extent != "extent" {
 		t.Fatalf("unexpected schema: %+v", frag.Schema)
 	}
-	if string(frag.Data) != string(payload) {
-		t.Fatalf("expected payload %q, got %q", payload, frag.Data)
+	if string(frag.tdata) != string(payload) {
+		t.Fatalf("expected payload %q, got %q", payload, frag.tdata)
 	}
 
 	if string(frag.Checksum) != string(expectedChecksum) {
@@ -93,15 +93,15 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	}
 
 	buf.Append(appendEncodedBytes(nil, payload))
-	beforeChecksum := buf.Fragments[0].Data
+	beforeChecksum := buf.Fragments[0].tdata
 	checksum := ChecksumFunc(beforeChecksum)
 
 	if disableChecksum {
 		checksum = checksum[:0]
 	}
 	buf.Append(appendEncodedBytes(nil, checksum))
-	
-	return buf.Fragments[0].Data, checksum
+
+	return buf.Fragments[0].tdata, checksum
 }
 
 func appendEncodedBytes(dst, payload []byte) []byte {

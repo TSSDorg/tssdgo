@@ -27,14 +27,14 @@ type School struct {
 }
 
 func (this *School)Equal(other *School) bool {
-	return this.Name == other.Name && tssd.SliceEqual(this.Camp, other.Camp) && 
-	this.EntryLeaveTime[0].Equal(other.EntryLeaveTime[0]) && this.EntryLeaveTime[1].Equal(other.EntryLeaveTime[1]) 
+	return this.Name == other.Name && tssd.SliceEqual(this.Camp, other.Camp) &&
+	this.EntryLeaveTime[0].Equal(other.EntryLeaveTime[0]) && this.EntryLeaveTime[1].Equal(other.EntryLeaveTime[1])
 }
 
 type Student struct {
 	tssd.Flat[Student, *Student]
 	ID    int64
-	Name  []string 
+	Name  []string
 	Age   uint8
 	Value float64
 	Levels  []int
@@ -93,7 +93,7 @@ func (this *Student) Equal(other *Student) bool {
 		}
 	}
 	fmt.Println("student Equal 3")
-	
+
 	return true
 }
 
@@ -102,12 +102,12 @@ var now = time.Now()
 func TestStudent(t *testing.T) {
 
 	v := Student {
-		ID: 101, 
-		Name: []string{"Tom", "W", "Bush"}, 
-		Value: 98.5, 
+		ID: 101,
+		Name: []string{"Tom", "W", "Bush"},
+		Value: 98.5,
 		Levels: []int{6, 7, 9, 8, 10},
-		Age: 22, 
-		Birth: now.AddDate(-22, 0, 0), 
+		Age: 22,
+		Birth: now.AddDate(-22, 0, 0),
 		IsMale: true,
 		Address: []string{"5th street 11", "1st road 123"},
 		Mail:  "tom@gmail.com",
@@ -129,17 +129,14 @@ func TestStudent(t *testing.T) {
 
 	tssd.MarshalTo(&v, n)
 
-	if len(n.Fragments[0].Data) == 0 {
-		t.Error("TestStruct return row-th failed")
-	}
 
 	tssd.Print(&v, *n)
 	fmt.Println("fragments:", len(n.Fragments))
 
 	var v2 Student
 	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
-	fmt.Println("-----v:", v)
-	
+	fmt.Println("-----v2:", v2)
+
 	if !v.Equal(&v2) {
 		t.Error("TestStruct student failed")
 	}
@@ -167,9 +164,6 @@ func TestStudent(t *testing.T) {
 	}
 
 	n, _ = tssd.Marshal(&v2)
-	if len(n.Fragments[0].Data) == 0 {
-		t.Error("TestStruct return row-th 2 failed")
-	}
 
 	var v3 Student
 
@@ -181,9 +175,6 @@ func TestStudent(t *testing.T) {
 	v2.Address = v2.Address[:0]
 
 	n, _ = tssd.Marshal(&v2)
-	if len(n.Fragments[0].Data) == 0 {
-		t.Error("TestStruct return row-th 2 failed")
-	}
 
 	tssd.UnmarshalTo(tssd.Pipe(n), &v3)
 	if !v3.Equal(&v2) {
@@ -204,21 +195,17 @@ func TestPrintMap(t *testing.T) {
 	s1 := student {
 		ID: 101,
 		Levels: []int{6, 7, 9, 8, 10},
-		Birth: now.AddDate(-22, 0, 0), 
+		Birth: now.AddDate(-22, 0, 0),
 		Address: []string{"5th street 11", "1st road 123"},
 		Courses: map[string]Course{
 			"phisi": {"phisi", now.AddDate(0, -5, 0), 80.5},
 			"english": {"englis", now.AddDate(0, -2, 0), 93.8},
 		},
 	}
-	
+
 	tssd.Register(&s1)
 
 	n, _ := tssd.Marshal(&s1)
-
-	if len(n.Fragments[0].Data) == 0 {
-		t.Error("TestStruct return row-th failed")
-	}
 
 	tssd.Print(&s1, *n)
 	fmt.Println("Tbase, Tbool, Tstring, Tarray, Tdict, Tobject, Ttime", tssd.Tbase, tssd.Tbool, tssd.Tstring, tssd.Tarray, tssd.Tdict, tssd.Tobject, tssd.Ttime)
@@ -228,7 +215,7 @@ func TestPrintMap(t *testing.T) {
 	fmt.Println("out:", string(out))
 
 	var sout student
-	
+
 	tssd.UnmarshalTo(tssd.Pipe(n), &sout)
 	fmt.Println(s1)
 	fmt.Println(sout)

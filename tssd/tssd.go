@@ -85,9 +85,7 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
-	Data []byte //TSSD content only
-	//Patches  []Patch
-	//checksum format: [Tarraym][Tuint8][sizet/4B][sizea/2B][checksum/12B]
+	tdata    []byte //TSSD content only
 	Checksum []byte //disgest of all the Fragment bytes
 	Raw      []byte //raw data including fragment header, TSSD content, Checksum
 }
@@ -126,8 +124,8 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 		Size: len(data),
 		Fragments: []Fragment{
 			Fragment{
-				Data: data,
-				Raw:  data,
+				tdata: data,
+				Raw:   data,
 			},
 		},
 	}
@@ -146,12 +144,12 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	}
 
 	posData := buf.pos + 8
-	frag.Data, err = mergeByteSliceDump(data[buf.pos:])
+	frag.tdata, err = mergeByteSliceDump(data[buf.pos:])
 	if err != nil {
 		return data, err
 	}
 	//data before Checksum need hash to validate
-	needCheck := data[0 : posData+len(frag.Data)]
+	needCheck := data[0 : posData+len(frag.tdata)]
 
 	posChecksum := len(needCheck) + 8
 	frag.Checksum, err = mergeByteSliceDump(data[len(needCheck):])
@@ -164,7 +162,7 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	}
 	frag.Raw = make([]byte, posChecksum+len(frag.Checksum))
 	copy(frag.Raw, data)
-	frag.Data = frag.Raw[posData : posData+len(frag.Data)]
+	frag.tdata = frag.Raw[posData : posData+len(frag.tdata)]
 	frag.Checksum = frag.Raw[posChecksum : posChecksum+len(frag.Checksum)]
 
 	return data[posChecksum+len(frag.Checksum):], nil
