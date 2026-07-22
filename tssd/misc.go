@@ -75,9 +75,9 @@ func Pipe(sender *Buffer) (receiver *Buffer) {
 	//TSSD produce in the sender.FragmentData
 	for i := 0; i < len(sender.Fragments); i++ {
 		frag := &Fragment{}
-		_, err := frag.Unmarshal(sender.Fragments[numbers[i]].Raw)
+		_, err := frag.Unmarshal(sender.Fragments[numbers[i]].Data)
 		if err != nil {
-			fmt.Println("data:", sender.Fragments[numbers[i]].Raw, numbers[i], err)
+			fmt.Println("data:", sender.Fragments[numbers[i]].Data, numbers[i], err)
 			panic("pipe output unmashal fail")
 		}
 		receiver.Push(frag)

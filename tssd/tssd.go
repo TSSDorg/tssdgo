@@ -1,6 +1,7 @@
 package tssd
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -85,11 +86,9 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
-	Data []byte //TSSD content only
-	//Patches  []Patch
-	//checksum format: [Tarraym][Tuint8][sizet/4B][sizea/2B][checksum/12B]
+	tdata    []byte //TSSD content only
 	Checksum []byte //disgest of all the Fragment bytes
-	Raw      []byte //raw data including fragment header, TSSD content, Checksum
+	Data     []byte //raw data including fragment header, TSSD content, Checksum
 }
 
 var HashFunc func([]byte) []byte = hash
@@ -107,13 +106,18 @@ func hash(types []byte) []byte {
 
 // we need unmarshal fragment manualy
 // @desc
-// input: data input raw data, make sure it begin with magic "TSSD"
+// input: data input raw data, make sure it contains magic "TSSDV"
 // return
 //
 //	[]byte: remain bytes after consume
 //	error:  ErrorInSufficientData means need more data to unmarshal
 //	        ErrorInvalidTSSDData is invalid data, you need drop all of them
-func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
+func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
+	i := bytes.Index(input, []byte(MAGIC))
+	if i < 0 {
+		return nil, ErrorInvalidTSSDData
+	}
+	data := input[i:]
 	if len(data) < 8 {
 		return data, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
@@ -126,8 +130,8 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 		Size: len(data),
 		Fragments: []Fragment{
 			Fragment{
-				Data: data,
-				Raw:  data,
+				tdata: data,
+				Data:  data,
 			},
 		},
 	}
@@ -146,12 +150,12 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	}
 
 	posData := buf.pos + 8
-	frag.Data, err = mergeByteSliceDump(data[buf.pos:])
+	frag.tdata, err = mergeByteSliceDump(data[buf.pos:])
 	if err != nil {
 		return data, err
 	}
 	//data before Checksum need hash to validate
-	needCheck := data[0 : posData+len(frag.Data)]
+	needCheck := data[0 : posData+len(frag.tdata)]
 
 	posChecksum := len(needCheck) + 8
 	frag.Checksum, err = mergeByteSliceDump(data[len(needCheck):])
@@ -162,10 +166,10 @@ func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
 	if err = frag.Validate(needCheck); err != nil {
 		return data, err
 	}
-	frag.Raw = make([]byte, posChecksum+len(frag.Checksum))
-	copy(frag.Raw, data)
-	frag.Data = frag.Raw[posData : posData+len(frag.Data)]
-	frag.Checksum = frag.Raw[posChecksum : posChecksum+len(frag.Checksum)]
+	frag.Data = make([]byte, posChecksum+len(frag.Checksum))
+	copy(frag.Data, data)
+	frag.tdata = frag.Data[posData : posData+len(frag.tdata)]
+	frag.Checksum = frag.Data[posChecksum : posChecksum+len(frag.Checksum)]
 
 	return data[posChecksum+len(frag.Checksum):], nil
 }
@@ -207,7 +211,12 @@ func init() {
 }
 
 func (this *Schema) Marshal(buf *Buffer) error {
-	return schemaTypeInfo.marshalTo(this, buf)
+	//buf.Clear()
+	err := schemaTypeInfo.marshalTo(this, buf)
+	if err == nil && buf.Size > 0 {
+		buf.Fragments[0].Data = buf.Fragments[0].Data[:buf.Size]
+	}
+	return err
 }
 
 func (this *Schema) Unmarshal(buf *Buffer) error {

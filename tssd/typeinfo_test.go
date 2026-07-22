@@ -48,7 +48,7 @@ func TestString(t *testing.T) {
 
 	buff := &Buffer{}
 	e := container.marshalTo(&sin1, buff)
-	if e != nil || len(buff.Fragments[0].Data) == 0 {
+	if e != nil || len(buff.Fragments[0].tdata) == 0 {
 		t.Errorf("Test String Marshal err %s", e)
 	}
 
