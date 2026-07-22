@@ -96,7 +96,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	}
 
 	buf.Append(appendEncodedBytes(nil, payload))
-	beforeChecksum := buf.Fragments[0].tdata
+	beforeChecksum := buf.fragments[0].tdata
 	checksum := ChecksumFunc(beforeChecksum)
 
 	if disableChecksum {
@@ -104,7 +104,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	}
 	buf.Append(appendEncodedBytes(nil, checksum))
 
-	return buf.Fragments[0].tdata, checksum
+	return buf.fragments[0].tdata, checksum
 }
 
 func appendEncodedBytes(dst, payload []byte) []byte {

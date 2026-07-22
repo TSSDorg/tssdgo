@@ -10,6 +10,10 @@ tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data w
 
 ## quick start
 
+a simple [transer demo](https://github.com/TSSDorg/tssdgo/blob/main/examples/transfer/student.go)
+
+another support struct version migration snippet
+
 ```
 //define a const group name for your class/struct
 //it will share between versions
@@ -96,10 +100,10 @@ func TestUnmarshalDecorate(t *testing.T) {
 	//1. got some TSSD data with Marshal api
 	buf, err := tssd.Marshal(&st)
 
-	//2. you can process the TSSD Raw data:  save, send to share etc.
-	//socket.Write(buf.Fragments[0].Raw)
+	//2. you can process the TSSD data:  save, send to share etc.
+	//socket.Write(buf.Fragments()[0].Data)
 	//if you would like to save, call Merge first
-	//file.Write(buf.Merge().Fragments[0].Raw)
+	//file.Write(buf.Merge().Fragments()[0].Data)
 
 	//3.  you can Unmarshal the TSSD data to object again after read or receive it
 	//buf input by v1, you can receive v1

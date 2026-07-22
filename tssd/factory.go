@@ -60,10 +60,10 @@ func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 
 // UnmarshalTo direct unmarshal to your object
 func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
-	if len(buf.Fragments) == 0 {
+	if len(buf.fragments) == 0 {
 		return ErrorInSufficientData
 	}
-	remoteHash := buf.Fragments[0].Schema.Hash
+	remoteHash := buf.fragments[0].Schema.Hash
 	local := factory.versions[dest.Version()].hash
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
@@ -105,10 +105,10 @@ func (factory *factory) decorate(flat, to Flatable) (Flatable, error) {
 
 // Unmarshal we new a current version object for user
 func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
-	if len(buf.Fragments) == 0 {
+	if len(buf.fragments) == 0 {
 		return nil, ErrorInSufficientData
 	}
-	remoteHash := buf.Fragments[0].Schema.Hash
+	remoteHash := buf.fragments[0].Schema.Hash
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
