@@ -9,6 +9,9 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 	payload := []byte("hello fragment")
 	data, expectedChecksum := buildFragmentBytes(t, payload, false)
 
+	//we add someting in head, which should drop by TSSD
+	data = append(append(make([]byte, 0, 1024), []byte("something")...), data...)
+
 	var frag Fragment
 	remaining, err := (&frag).Unmarshal(append(data, []byte("extra")...))
 	if err != nil {
@@ -41,7 +44,7 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 
 func TestFragmentUnmarshalRejectsShortInput(t *testing.T) {
 	var frag Fragment
-	_, err := frag.Unmarshal([]byte("TSSD"))
+	_, err := frag.Unmarshal([]byte(MAGIC))
 	if !errors.Is(err, ErrorInSufficientData) {
 		t.Fatalf("expected ErrorInSufficientData, got %v", err)
 	}

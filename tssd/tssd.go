@@ -1,6 +1,7 @@
 package tssd
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -105,13 +106,18 @@ func hash(types []byte) []byte {
 
 // we need unmarshal fragment manualy
 // @desc
-// input: data input raw data, make sure it begin with magic "TSSD"
+// input: data input raw data, make sure it contains magic "TSSDV"
 // return
 //
 //	[]byte: remain bytes after consume
 //	error:  ErrorInSufficientData means need more data to unmarshal
 //	        ErrorInvalidTSSDData is invalid data, you need drop all of them
-func (frag *Fragment) Unmarshal(data []byte) ([]byte, error) {
+func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
+	i := bytes.Index(input, []byte(MAGIC))
+	if i < 0 {
+		return nil, ErrorInvalidTSSDData
+	}
+	data := input[i:]
 	if len(data) < 8 {
 		return data, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
@@ -205,7 +211,12 @@ func init() {
 }
 
 func (this *Schema) Marshal(buf *Buffer) error {
-	return schemaTypeInfo.marshalTo(this, buf)
+	//buf.Clear()
+	err := schemaTypeInfo.marshalTo(this, buf)
+	if err == nil && buf.Size > 0 {
+		buf.Fragments[0].Data = buf.Fragments[0].Data[:buf.Size]
+	}
+	return err
 }
 
 func (this *Schema) Unmarshal(buf *Buffer) error {

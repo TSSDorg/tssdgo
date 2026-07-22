@@ -21,6 +21,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	if buf.MTU == 0 {
 		buf.MTU = TSSD_BUFFER_MTU
 	}
+	//buf.Clear()
 	buf.MTU = max(buf.MTU, TSSD_BUFFER_MIN_MTU)
 	buf.schema = &schema
 	buf.heads = make([]byte, 0, buf.MTU/3)
@@ -62,6 +63,15 @@ func (buf *Buffer) Rewind() *Buffer {
 	for i := 0; i < len(buf.Fragments); i++ {
 		buf.Size += len(buf.Fragments[i].tdata)
 	}
+	return buf
+}
+
+func (buf *Buffer) Clear() *Buffer {
+	buf.index, buf.pos, buf.Size = 0, 0, 0
+	buf.heads = buf.heads[:0]
+	buf.lenChecksum = 0
+
+	buf.Fragments = buf.Fragments[:0]
 	return buf
 }
 
