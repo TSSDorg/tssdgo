@@ -93,7 +93,7 @@ func handleEcho(rw io.ReadWriter) error {
 		}
 
 		// marshal into a Buffer
-		// then you got the data:  Buffer.Fragments[i].Data
+		// then you got the data:  Buffer.Fragments()[i].Data
 		if err := tssd.MarshalTo(v, nbuf); err != nil {
 			fmt.Println("Error occurred while marshalling:", err)
 			return err
@@ -110,13 +110,13 @@ func handleEcho(rw io.ReadWriter) error {
 	switch {
 	case schema.Fragment <= 0:
 
-		// get the data from Buffer.Fragments[i].Data
-		for i := 0; i < len(nbuf.Fragments); i++ {
-			n, err := rw.Write(nbuf.Fragments[i].Data)
-			fmt.Println("writing:", err, n, nbuf.Size, len(nbuf.Fragments[i].Data), nbuf.Fragments[i].Data)
+		// get the data from Buffer.Fragments()[i].Data
+		for i := 0; i < len(nbuf.Fragments()); i++ {
+			n, err := rw.Write(nbuf.Fragments()[i].Data)
+			fmt.Println("writing:", err, n, nbuf.Size, len(nbuf.Fragments()[i].Data), nbuf.Fragments()[i].Data)
 		}
-	case schema.Fragment > 0 && schema.Fragment <= int16(len(nbuf.Fragments)):
-		rw.Write(nbuf.Fragments[schema.Fragment-1].Data)
+	case schema.Fragment > 0 && schema.Fragment <= int16(len(nbuf.Fragments())):
+		rw.Write(nbuf.Fragments()[schema.Fragment-1].Data)
 	default:
 		fmt.Println("Invalid fragment number:", schema.Fragment)
 	}
@@ -155,7 +155,7 @@ func query(rw io.ReadWriter) {
 
 	cBuf := &tssd.Buffer{}
 	schema.Marshal(cBuf)
-	rw.Write(cBuf.Fragments[0].Data)
+	rw.Write(cBuf.Fragments()[0].Data)
 
 	fBuf := &tssd.Buffer{}
 
@@ -186,8 +186,8 @@ func query(rw io.ReadWriter) {
 	// we simple send a schema, you should design your protocol to interaction with you server
 	schema.Fragment = 2
 	schema.Marshal(cBuf.Clear())
-	rw.Write(cBuf.Fragments[0].Data)
-	fmt.Println("send schema:", cBuf.Fragments[0].Data)
+	rw.Write(cBuf.Fragments()[0].Data)
+	fmt.Println("send schema:", cBuf.Fragments()[0].Data)
 
 	bs, frag = handleFragmentRecv(rw, bs)
 	if frag == nil {

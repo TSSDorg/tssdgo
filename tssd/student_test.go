@@ -131,7 +131,7 @@ func TestStudent(t *testing.T) {
 
 
 	tssd.Print(&v, *n)
-	fmt.Println("fragments:", len(n.Fragments))
+	fmt.Println("fragments:", len(n.Fragments()))
 
 	var v2 Student
 	tssd.UnmarshalTo(tssd.Pipe(n), &v2)
@@ -141,9 +141,9 @@ func TestStudent(t *testing.T) {
 		t.Error("TestStruct student failed")
 	}
 
-	beforeMTU, beforeLen :=  n.MTU, len(n.Fragments)
+	beforeMTU, beforeLen :=  n.MTU, len(n.Fragments())
 	n.Split(378) //do nothing when split large
-	if beforeMTU != n.MTU || beforeLen != len(n.Fragments) {
+	if beforeMTU != n.MTU || beforeLen != len(n.Fragments()) {
 		t.Error("TestStudent split large MTU should do nothing")
 	}
 
@@ -158,7 +158,7 @@ func TestStudent(t *testing.T) {
 	n.Rewind().Split(378)
 	var v5 Student
 	tssd.UnmarshalTo(n, &v5)
-	fmt.Println("-----v5:", v5, len(n.Fragments), n.MTU)
+	fmt.Println("-----v5:", v5, len(n.Fragments()), n.MTU)
 	if !v.Equal(&v5) {
 		t.Error("TestStruct student split failed")
 	}

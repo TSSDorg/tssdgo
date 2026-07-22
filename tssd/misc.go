@@ -61,7 +61,7 @@ func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
 func Pipe(sender *Buffer) (receiver *Buffer) {
 
 	receiver = &Buffer{}
-	numbers := make([]int, len(sender.Fragments))
+	numbers := make([]int, len(sender.fragments))
 	for i := 0; i < len(numbers); i++ {
 		numbers[i] = i
 	}
@@ -73,11 +73,11 @@ func Pipe(sender *Buffer) (receiver *Buffer) {
 	})
 
 	//TSSD produce in the sender.FragmentData
-	for i := 0; i < len(sender.Fragments); i++ {
+	for i := 0; i < len(sender.fragments); i++ {
 		frag := &Fragment{}
-		_, err := frag.Unmarshal(sender.Fragments[numbers[i]].Data)
+		_, err := frag.Unmarshal(sender.fragments[numbers[i]].Data)
 		if err != nil {
-			fmt.Println("data:", sender.Fragments[numbers[i]].Data, numbers[i], err)
+			fmt.Println("data:", sender.fragments[numbers[i]].Data, numbers[i], err)
 			panic("pipe output unmashal fail")
 		}
 		receiver.Push(frag)

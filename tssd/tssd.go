@@ -128,7 +128,7 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 
 	buf := &Buffer{
 		Size: len(data),
-		Fragments: []Fragment{
+		fragments: []Fragment{
 			Fragment{
 				tdata: data,
 				Data:  data,
@@ -214,7 +214,7 @@ func (this *Schema) Marshal(buf *Buffer) error {
 	//buf.Clear()
 	err := schemaTypeInfo.marshalTo(this, buf)
 	if err == nil && buf.Size > 0 {
-		buf.Fragments[0].Data = buf.Fragments[0].Data[:buf.Size]
+		buf.fragments[0].Data = buf.fragments[0].Data[:buf.Size]
 	}
 	return err
 }
