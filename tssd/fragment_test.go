@@ -109,7 +109,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 
 func appendEncodedBytes(dst, payload []byte) []byte {
 	dst = append(dst, byte(Tarraym), byte(Tuint8))
-	dst = appendSize4(dst, len(payload))
+	dst = appendSize4(dst, len(payload) + 2)
 	dst = appendSize2(dst, len(payload))
 	return append(dst, payload...)
 }

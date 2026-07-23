@@ -206,7 +206,7 @@ func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, buf *Buffer) err
 
 	arrayN := value.Len()
 	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
-	totalSize := ti.info[0].size * arrayN
+	totalSize := ti.info[0].size * arrayN + TSSD_SIZEA_LENGTH
 	buf.appendSize4(totalSize).appendSize2(arrayN)
 
 	for i := range arrayN {

@@ -51,7 +51,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	//we will try to calc the real size of Checksum
 	buf.lenChecksum = 8 + len(ChecksumFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - buf.lenChecksum
-	nbuf.appendSize4(avail) //reserve sizet
+	nbuf.appendSize4(avail + TSSD_SIZEA_LENGTH) //reserve sizet
 	nbuf.appendSize2(avail)
 	//we will keep a copy of schema in buf.heads
 	if nbuf.Size >= avail { //TSSD Heads too large than the MTU(fragment limitation)
@@ -96,7 +96,7 @@ func (buf *Buffer) finish() {
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
 	length := len(buf.fragments[buf.windex].tdata)
-	appendSize4(buf.fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length)
+	appendSize4(buf.fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length+TSSD_SIZEA_LENGTH)
 	appendSize2(buf.fragments[buf.windex].Data[:pos-TSSD_SIZEA_LENGTH], length)
 
 	//reset Data to the real size, we will use Data to send out
@@ -113,7 +113,7 @@ func (buf *Buffer) appendChecksum(index int) {
 	//exclude all info about checksum
 	buf.fragments[index].Data = append(buf.fragments[index].Data, byte(Tarraym))
 	buf.fragments[index].Data = append(buf.fragments[index].Data, byte(Tuint8))
-	buf.fragments[index].Data = appendSize4(buf.fragments[index].Data, len(checksum))
+	buf.fragments[index].Data = appendSize4(buf.fragments[index].Data, len(checksum)+TSSD_SIZEA_LENGTH)
 	buf.fragments[index].Data = appendSize2(buf.fragments[index].Data, len(checksum))
 	buf.fragments[index].Data = append(buf.fragments[index].Data, checksum...)
 }
