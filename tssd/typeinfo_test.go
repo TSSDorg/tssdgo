@@ -377,14 +377,11 @@ func TestNestStructArray(t *testing.T) {
 	container := parse(in1)
 
 	is := []int8{Tobject, 3, 0, Tarraym, Tint16, Tarray, Tobject, 3, 0, Tuint32, Tarray, Ttime, Tstring, Tarray, Tstring, Tarray, Tstring}
-	bs := make([]byte, len(is))
-	for i := 0; i < len(is); i++ {
-		bs[i] = byte(is[i])
-	}
-	if !SliceEqual(container.types(), bs) {
-		fmt.Println("Types:", container.types(), ", bs:", bs)
+
+	if !TypesEqual(container.types(), is) {
 		t.Errorf("Test TestNestStructArray types fail")
 	}
+
 	n, _ := container.marshal(&in1)
 	fmt.Println("in1:", in1)
 

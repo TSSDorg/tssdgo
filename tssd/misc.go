@@ -125,3 +125,15 @@ const (
 	minInt64 = int64(-maxInt64 - 1)
 	maxInt64 = int64(maxUint64 >> 1)
 )
+
+func TypesEqual(types []byte, expect []int8) bool {
+	if len(types) != len(expect) {
+		return false
+	}
+
+	bs := make([]byte, len(expect))
+	for i := 0; i < len(expect); i++ {
+		bs[i] = byte(expect[i])
+	}
+	return SliceEqual(types, bs)
+}
