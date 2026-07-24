@@ -309,7 +309,7 @@ func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
 
 // return fragment id with error if lost
 func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
-	if frag == nil || len(frag.Data) == 0 {
+	if frag == nil || len(frag.tdata) == 0 {
 		return buf.Wanted(), ErrorInvalidTSSDData
 	}
 	if buf.schema == nil {
