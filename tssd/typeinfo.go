@@ -472,13 +472,17 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			ti.mapSave, ti.mapDump = (*typeInfo).mapTimeSave, (*typeInfo).mapTimeDump
 			return ti
 		}
-		ti.setType(Tobject)
+
 		ti.save = (*typeInfo).objSave
 		ti.dump = (*typeInfo).objDump
 		ti.mapSave, ti.mapDump = (*typeInfo).mapStructSave, (*typeInfo).mapStructDump
 
 		fields := reflect.TypeOf(intf)
 		num := fields.NumField()
+
+		ti.setType(Tobject)
+		//we append struct's fields to validate
+		ti.root.stype = appendSize2(ti.root.stype, len(ti.info))
 
 		ti.info = make([]typeInfo, num)
 		var j = 0
@@ -493,8 +497,6 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			j++
 		}
 		ti.info = ti.info[:j]
-		//we append struct's fields to validate
-		ti.root.stype = appendSize2(ti.root.stype, len(ti.info))
 
 	case reflect.Array, reflect.Slice: //for array, the memorry is continus:  &array==&array[0]
 		ti.setType(Tarray)
