@@ -86,6 +86,7 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
+	heads    []byte //bytes before payload
 	payload  []byte //TSSD content only
 	Checksum []byte //disgest of all the Fragment bytes
 	Data     []byte //raw data including fragment header, TSSD content, Checksum
@@ -167,6 +168,7 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 	}
 	frag.Data = make([]byte, posChecksum+len(frag.Checksum))
 	copy(frag.Data, data)
+	frag.heads = frag.Data[:posData]
 	frag.payload = frag.Data[posData : posData+len(frag.payload)]
 	frag.Checksum = frag.Data[posChecksum : posChecksum+len(frag.Checksum)]
 
