@@ -430,9 +430,22 @@ func toTSSDType(kind reflect.Kind) (typee int8) {
 	return typee
 }
 
-func (ti *typeInfo) setType(typ int8) {
+func (ti *typeInfo) updateType(typ int8, pos int) {
 	ti.Type = typ
+	ti.root.stype[pos] = byte(typ)
+}
+
+// set type
+// append to types
+// return the prevous size, we can update it later if needed
+func (ti *typeInfo) setType(typ int8) (pos int) {
+	ti.Type = typ
+	pos = len(ti.root.stype)
 	ti.root.stype = append(ti.root.stype, byte(ti.Type))
+	if typ == Ttime {
+		ti.root.stype = append(ti.root.stype, byte(Tstring)) //for Ttime, add subtype
+	}
+	return pos
 }
 
 func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
@@ -472,13 +485,19 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			ti.mapSave, ti.mapDump = (*typeInfo).mapTimeSave, (*typeInfo).mapTimeDump
 			return ti
 		}
-		ti.setType(Tobject)
+
 		ti.save = (*typeInfo).objSave
 		ti.dump = (*typeInfo).objDump
 		ti.mapSave, ti.mapDump = (*typeInfo).mapStructSave, (*typeInfo).mapStructDump
 
 		fields := reflect.TypeOf(intf)
 		num := fields.NumField()
+
+		ti.setType(Tobject)
+
+		//we append struct's fields to validate, but exclude Flat self
+		pos := len(ti.root.stype)
+		ti.root.stype = appendSize2(ti.root.stype, num)
 
 		ti.info = make([]typeInfo, num)
 		var j = 0
@@ -493,11 +512,10 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			j++
 		}
 		ti.info = ti.info[:j]
-		//we append struct's fields to validate
-		ti.root.stype = appendSize2(ti.root.stype, len(ti.info))
+		appendSize2(ti.root.stype[:pos], j) // update fields num to skip Flat self
 
 	case reflect.Array, reflect.Slice: //for array, the memorry is continus:  &array==&array[0]
-		ti.setType(Tarray)
+		pos := ti.setType(Tarray)
 		ti.save = (*typeInfo).sliceSave
 		ti.dump = (*typeInfo).sliceDump
 		ti.size = value.Len()
@@ -513,7 +531,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		}
 
 		if ti.info[0].isFixedLength {
-			ti.setType(Tarraym)
+			ti.updateType(Tarraym, pos)
 			ti.save = (*typeInfo).mergeSliceSave
 			ti.dump = (*typeInfo).mergeSliceDump
 			ti.mapSave, ti.mapDump = (*typeInfo).mapMergeSliceValueSave, (*typeInfo).mapMergeSliceValueDump
