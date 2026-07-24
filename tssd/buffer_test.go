@@ -12,7 +12,7 @@ func TestBuffer(t *testing.T) {
 
 	buf.Append([]byte(MAGIC))
 
-	if !isMagic(buf.fragments[0].tdata) || buf.Size != len(MAGIC) {
+	if !isMagic(buf.fragments[0].payload) || buf.Size != len(MAGIC) {
 		t.Error("Buffer Append MAGIC err")
 	}
 }
@@ -23,13 +23,13 @@ func TestBuffer2(t *testing.T) {
 	}
 
 	buf.Append([]byte(MAGIC))
-	if buf.Size != len(MAGIC) || len(buf.fragments) != 3 || cap(buf.fragments[0].tdata) != buf.MTU {
+	if buf.Size != len(MAGIC) || len(buf.fragments) != 3 || cap(buf.fragments[0].payload) != buf.MTU {
 		t.Error("Buffer Append magic err")
 	}
 
-	if string(buf.fragments[0].tdata) != string([]byte(MAGIC)[:buf.MTU]) ||
-		string(buf.fragments[1].tdata) != string([]byte(MAGIC)[buf.MTU:buf.MTU*2]) ||
-		string(buf.fragments[2].tdata) != string([]byte(MAGIC)[buf.MTU*2:]) {
+	if string(buf.fragments[0].payload) != string([]byte(MAGIC)[:buf.MTU]) ||
+		string(buf.fragments[1].payload) != string([]byte(MAGIC)[buf.MTU:buf.MTU*2]) ||
+		string(buf.fragments[2].payload) != string([]byte(MAGIC)[buf.MTU*2:]) {
 		t.Error("Buffer Append magic content err")
 	}
 
@@ -65,7 +65,7 @@ func getData(buf *Buffer) [][]byte {
 
 	ret := make([][]byte, len(buf.fragments))
 	for i := 0; i < len(buf.fragments); i++ {
-		ret[i] = buf.fragments[i].tdata
+		ret[i] = buf.fragments[i].payload
 	}
 	return ret
 }
