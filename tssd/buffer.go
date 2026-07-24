@@ -10,15 +10,18 @@ type Buffer struct {
 	heads       []byte
 	lenChecksum int
 	MTU         int
-	Size        int        //total size
-	index       int        //read index
-	pos         int        //read position
-	windex      int        //write index
-	fragments   []Fragment //framents list sending/received
+	Size        int               //total size
+	index       int               //read index
+	pos         int               //read position
+	windex      int               //write index
+	fragments   map[int]*Fragment //framents list sending/received
 }
 
-func (buf *Buffer) Fragments() []Fragment {
-	return buf.fragments
+func (buf *Buffer) Fragments() (list []*Fragment) {
+	for i := 0; i < len(buf.fragments); i++ {
+		list = append(list, buf.fragments[i])
+	}
+	return list
 }
 
 func (buf *Buffer) prepare(schema Schema) error {
@@ -32,8 +35,8 @@ func (buf *Buffer) prepare(schema Schema) error {
 	//create a new buffer to receive
 	nbuf := &Buffer{
 		MTU: buf.MTU,
-		fragments: []Fragment{
-			Fragment{
+		fragments: map[int]*Fragment{
+			0: &Fragment{
 				tdata: buf.heads,
 				Data:  buf.heads,
 			},
@@ -75,7 +78,7 @@ func (buf *Buffer) Clear() *Buffer {
 	buf.heads = buf.heads[:0]
 	buf.lenChecksum = 0
 
-	buf.fragments = buf.fragments[:0]
+	clear(buf.fragments)
 	return buf
 }
 
@@ -124,16 +127,19 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			if buf.MTU == 0 {
 				buf.MTU = TSSD_BUFFER_MTU
 			}
+			if buf.fragments == nil {
+				buf.fragments = make(map[int]*Fragment)
+			}
 			b := make([]byte, buf.MTU, buf.MTU)
 			copy(b, buf.heads)
 
-			buf.fragments = append(buf.fragments,
-				Fragment{
-					tdata: b[len(buf.heads):len(buf.heads)],
-					Data:  b[:buf.MTU-buf.lenChecksum],
-				})
+			buf.fragments[buf.windex] = &Fragment{
+				tdata: b[len(buf.heads):len(buf.heads)],
+				Data:  b[:buf.MTU-buf.lenChecksum],
+			}
 			if buf.schema != nil {
 				buf.fragments[buf.windex].Schema = *buf.schema
+				buf.fragments[buf.windex].Schema.Fragment = int16(buf.windex + 1)
 			}
 			buf.updateFragmentID(buf.windex, buf.windex+1)
 		}
@@ -303,68 +309,53 @@ func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
 
 // return fragment id with error if lost
 func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
+	if frag == nil || len(frag.Data) == 0 {
+		return buf.Wanted(), ErrorInvalidTSSDData
+	}
 	if buf.schema == nil {
+		buf.fragments = make(map[int]*Fragment)
 		buf.schema = &frag.Schema
-	} else {
-		if buf.schema.Hash != frag.Schema.Hash {
-			err = ErrorTSSDDataSchemaUnmatch
-		}
-		if buf.schema.TID != frag.Schema.TID {
-			err = ErrorTSSDDataFragmentIDUnmatch
-		}
-		if err != nil {
-			if miss = buf.Wanted(); miss != 0 {
-				return miss, err
-			}
-			return 0, nil
-		}
-	}
-	fid := int(frag.Schema.Fragment) //fid: [1, 2, 3.. -n], the last < 0
-	if fid < 0 {
-		fid = -fid
-	}
-	if cap(buf.fragments) < fid {
-		frags := buf.fragments
-		buf.fragments = make([]Fragment, cap(frags)+32)
-		for i := 0; i < cap(frags); i++ {
-			buf.fragments[i] = frags[i]
-		}
+		buf.heads = frag.Data[0 : len(frag.Data)-len(frag.tdata)]
+		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	}
 
-	if buf.fragments[fid-1].Schema.Fragment != 0 {
+	if buf.schema.Hash != frag.Schema.Hash {
+		return buf.Wanted(), ErrorTSSDDataSchemaUnmatch
+	}
+	if buf.schema.TID != frag.Schema.TID {
+		return buf.Wanted(), ErrorTSSDDataFragmentIDUnmatch
+	}
+
+	fid := int(frag.Schema.Fragment) //fid: [1, 2, 3.. -n], the last < 0
+	fid = max(-fid, fid)             //Abs
+
+	if _, ok := buf.fragments[fid-1]; ok {
 		buf.Size -= len(buf.fragments[fid-1].tdata)
 	}
 
 	//we always copy it, even repeat push
-	buf.fragments[fid-1] = *frag
-	buf.Size += len(buf.fragments[fid-1].tdata)
-	if len(buf.heads) == 0 && len(buf.fragments[0].Data) > len(buf.fragments[0].tdata) {
-		buf.heads = buf.fragments[0].Data[0 : len(buf.fragments[0].Data)-len(buf.fragments[0].tdata)]
-		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
-	}
+	buf.fragments[fid-1] = frag
+	buf.Size += len(frag.tdata)
 
-	if miss = buf.Wanted(); miss != 0 {
-		return miss, ErrorInSufficientData
-	}
-	return 0, nil
+	return buf.Wanted(), nil
 }
 
 // return the n-th Fragment that missing
 // return 0 if all fragments are present
 func (buf *Buffer) Wanted() int {
 	//find if we miss one
-	for i := 0; i < cap(buf.fragments); i++ {
-		switch {
-		case buf.fragments[i].Schema.Fragment == 0:
+	i := 0
+	for ; i < len(buf.fragments); i++ {
+		fra, ok := buf.fragments[i]
+		if !ok {
 			return i + 1
-		case buf.fragments[i].Schema.Fragment < 0:
-			//we hit last one, reset the size
-			buf.fragments = buf.fragments[0 : i+1]
+		}
+		if fra.Schema.Fragment < 0 {
 			return 0
-		default:
 		}
 	}
-	return 1
+	// report missing first fragment if empty
+	return i + 1
 }
 
 // merge all Fragments into one
@@ -373,14 +364,14 @@ func (buf *Buffer) Merge() *Buffer {
 		return buf
 	}
 	frags := buf.fragments //old frags
-	buf.fragments = []Fragment{
-		Fragment{
+	buf.fragments = map[int]*Fragment{
+		0: &Fragment{
 			Header: frags[0].Header,
 			Schema: frags[0].Schema,
 			Data:   make([]byte, 0, len(buf.fragments[0].Data)-len(buf.fragments[0].tdata)+buf.Size),
 		},
 	}
-	frag := &buf.fragments[0] //new one
+	frag := buf.fragments[0] //new one
 	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].tdata)
 	frag.Data = append(frag.Data, frags[0].Data[:headLen]...)
 	frag.tdata = frag.Data[headLen:headLen]
@@ -401,12 +392,12 @@ func (buf *Buffer) Merge() *Buffer {
 // split large fragments into small ones
 func (buf *Buffer) Split(mtu int) *Buffer {
 	nMTU := max(mtu, TSSD_BUFFER_MIN_MTU)
-	if buf.MTU < nMTU {
+	if buf.MTU < nMTU || buf.Size <= nMTU {
 		return buf
 	}
 	// merge first
 	buf.Merge()
-	frag := &buf.fragments[0]
+	frag := buf.fragments[0]
 
 	// init buf by the new mtu
 	buf.MTU = nMTU
@@ -414,7 +405,7 @@ func (buf *Buffer) Split(mtu int) *Buffer {
 	buf.windex = 0
 	buf.index = 0
 	buf.pos = 0
-	buf.fragments = []Fragment{}
+	buf.fragments = make(map[int]*Fragment)
 
 	// append all data back
 	return buf.Append(frag.tdata)
