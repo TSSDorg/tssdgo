@@ -232,7 +232,7 @@ func (factory factory) print(version string, buf *Buffer) error {
 	}
 
 	//header, err := //dumpHeader(buf)
-	frag := &buf.fragments[0]
+	frag := buf.fragments[0]
 	header := frag.Header
 	fmt.Println("header:", header, info)
 	headerNode := &Node{

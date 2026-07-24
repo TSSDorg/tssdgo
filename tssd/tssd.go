@@ -128,8 +128,8 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 
 	buf := &Buffer{
 		Size: len(data),
-		fragments: []Fragment{
-			Fragment{
+		fragments: map[int]*Fragment{
+			0: &Fragment{
 				tdata: data,
 				Data:  data,
 			},
@@ -196,7 +196,7 @@ func mergeByteSliceDump(input []byte) ([]byte, error) {
 	var arrayN int16
 	copy(Slice(Ptr(&arrayN), unsafe.Sizeof(arrayN)), input[6:])
 
-	if size4 != int32(arrayN) + TSSD_SIZEA_LENGTH {
+	if size4 != int32(arrayN)+TSSD_SIZEA_LENGTH {
 		return nil, ErrorInvalidTSSDData
 	}
 	if len(input[8:]) < int(arrayN) {

@@ -1,7 +1,7 @@
 package tssd
 
 import (
-	"errors"
+	//"errors"
 	"testing"
 	//tssd "github.com/tssdorg/tssdgo/tssd"
 )
@@ -264,15 +264,15 @@ func TestBufferPushAndWanted(t *testing.T) {
 	second := &Fragment{Data: []byte("world"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 2}}
 
 	miss, err := buf.Push(first)
-	if !errors.Is(err, ErrorInSufficientData) {
-		t.Fatalf("expected insufficient data error, got %v", err)
+	if err != nil {
+		t.Fatalf("expected push success data, but got error: %v", err)
 	}
 	if miss != 2 {
 		t.Fatalf("expected missing fragment 2 after first push, got %d", miss)
 	}
 
 	miss, err = buf.Push(second)
-	if err == nil {
+	if err != nil {
 		t.Fatalf("pushing second fragment failed: %v", err)
 	}
 	if miss != 3 {
