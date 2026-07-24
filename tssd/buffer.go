@@ -134,6 +134,7 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			copy(b, buf.heads)
 
 			buf.fragments[buf.windex] = &Fragment{
+				heads:   b[:len(buf.heads)],
 				payload: b[len(buf.heads):len(buf.heads)],
 				Data:    b[:buf.MTU-buf.lenChecksum],
 			}
@@ -315,8 +316,8 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	if buf.schema == nil {
 		buf.fragments = make(map[int]*Fragment)
 		buf.schema = &frag.Schema
-		buf.heads = frag.Data[0 : len(frag.Data)-len(frag.payload)]
-		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
+		buf.heads = frag.heads
+		buf.lenChecksum = len(frag.Data) - len(frag.heads) - len(frag.payload) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	}
 
 	if buf.schema.Hash != frag.Schema.Hash {
@@ -368,18 +369,19 @@ func (buf *Buffer) Merge() *Buffer {
 		0: &Fragment{
 			Header: frags[0].Header,
 			Schema: frags[0].Schema,
-			Data:   make([]byte, 0, len(buf.fragments[0].Data)-len(buf.fragments[0].payload)+buf.Size),
+			Data:   make([]byte, 0, len(frags[0].Data)-len(frags[0].payload)+buf.Size),
 		},
 	}
 	frag := buf.fragments[0] //new one
 	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].payload)
 	frag.Data = append(frag.Data, frags[0].Data[:headLen]...)
 	frag.payload = frag.Data[headLen:headLen]
+	frag.heads = frag.Data[:headLen]
 	buf.Size = 0
 	buf.windex = 0
 	buf.MTU = cap(frag.Data)
 	if len(buf.heads) == 0 {
-		buf.heads = frag.Data[0:headLen]
+		buf.heads = frag.Data[:headLen]
 	}
 
 	for i := 0; i < len(frags); i++ {
