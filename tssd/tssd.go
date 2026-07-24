@@ -86,7 +86,7 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
-	tdata    []byte //TSSD content only
+	payload  []byte //TSSD content only
 	Checksum []byte //disgest of all the Fragment bytes
 	Data     []byte //raw data including fragment header, TSSD content, Checksum
 }
@@ -122,16 +122,12 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 		return data, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
 	}
 
-	if !isMagic(data) || data[7] != byte(Tschema) {
-		return data, fmt.Errorf("%w [magic header not 'TSSD' or schema %d invalid]", ErrorInvalidTSSDData, data[7])
-	}
-
 	buf := &Buffer{
 		Size: len(data),
 		fragments: map[int]*Fragment{
 			0: &Fragment{
-				tdata: data,
-				Data:  data,
+				payload: data,
+				Data:    data,
 			},
 		},
 	}
@@ -139,23 +135,26 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 	buf.Read(frag.Header.Magic[:])
 	buf.Read(frag.Header.Version[:])
 
-	//skip Tschema
-	if _, err := buf.ReadByte(); err != nil {
+	// Tschema
+	b, err := buf.ReadByte()
+	if err != nil {
 		return data, ErrorInSufficientData
 	}
+	if b != byte(Tschema) {
+		return data, fmt.Errorf("%w [schema type %d invalid]", ErrorInvalidTSSDData, b)
+	}
 
-	err := (&frag.Schema).Unmarshal(buf)
-	if err != nil {
+	if err = (&frag.Schema).Unmarshal(buf); err != nil {
 		return data, err
 	}
 
 	posData := buf.pos + 8
-	frag.tdata, err = mergeByteSliceDump(data[buf.pos:])
+	frag.payload, err = mergeByteSliceDump(data[buf.pos:])
 	if err != nil {
 		return data, err
 	}
 	//data before Checksum need hash to validate
-	needCheck := data[0 : posData+len(frag.tdata)]
+	needCheck := data[0 : posData+len(frag.payload)]
 
 	posChecksum := len(needCheck) + 8
 	frag.Checksum, err = mergeByteSliceDump(data[len(needCheck):])
@@ -168,7 +167,7 @@ func (frag *Fragment) Unmarshal(input []byte) ([]byte, error) {
 	}
 	frag.Data = make([]byte, posChecksum+len(frag.Checksum))
 	copy(frag.Data, data)
-	frag.tdata = frag.Data[posData : posData+len(frag.tdata)]
+	frag.payload = frag.Data[posData : posData+len(frag.payload)]
 	frag.Checksum = frag.Data[posChecksum : posChecksum+len(frag.Checksum)]
 
 	return data[posChecksum+len(frag.Checksum):], nil

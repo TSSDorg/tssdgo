@@ -37,8 +37,8 @@ func (buf *Buffer) prepare(schema Schema) error {
 		MTU: buf.MTU,
 		fragments: map[int]*Fragment{
 			0: &Fragment{
-				tdata: buf.heads,
-				Data:  buf.heads,
+				payload: buf.heads,
+				Data:    buf.heads,
 			},
 		},
 	}
@@ -60,7 +60,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	if nbuf.Size >= avail { //TSSD Heads too large than the MTU(fragment limitation)
 		return ErrorTSSDHeadOverSizeFragment
 	}
-	buf.heads = nbuf.fragments[0].tdata[:nbuf.Size]
+	buf.heads = nbuf.fragments[0].payload[:nbuf.Size]
 	return nil
 }
 
@@ -68,7 +68,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 func (buf *Buffer) Rewind() *Buffer {
 	buf.index, buf.pos, buf.Size = 0, 0, 0
 	for i := 0; i < len(buf.fragments); i++ {
-		buf.Size += len(buf.fragments[i].tdata)
+		buf.Size += len(buf.fragments[i].payload)
 	}
 	return buf
 }
@@ -84,7 +84,7 @@ func (buf *Buffer) Clear() *Buffer {
 
 func (buf *Buffer) writePos() (int, int) {
 	idx := len(buf.fragments) - 1
-	pos := len(buf.fragments[idx].tdata)
+	pos := len(buf.fragments[idx].payload)
 	if pos >= buf.avail(idx) {
 		pos = 0
 		idx++
@@ -98,7 +98,7 @@ func (buf *Buffer) finish() {
 
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
-	length := len(buf.fragments[buf.windex].tdata)
+	length := len(buf.fragments[buf.windex].payload)
 	appendSize4(buf.fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length+TSSD_SIZEA_LENGTH)
 	appendSize2(buf.fragments[buf.windex].Data[:pos-TSSD_SIZEA_LENGTH], length)
 
@@ -134,8 +134,8 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			copy(b, buf.heads)
 
 			buf.fragments[buf.windex] = &Fragment{
-				tdata: b[len(buf.heads):len(buf.heads)],
-				Data:  b[:buf.MTU-buf.lenChecksum],
+				payload: b[len(buf.heads):len(buf.heads)],
+				Data:    b[:buf.MTU-buf.lenChecksum],
 			}
 			if buf.schema != nil {
 				buf.fragments[buf.windex].Schema = *buf.schema
@@ -144,14 +144,14 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			buf.updateFragmentID(buf.windex, buf.windex+1)
 		}
 
-		if len(buf.fragments[buf.windex].tdata)+len(bs) <= buf.avail(buf.windex) {
-			buf.fragments[buf.windex].tdata = append(buf.fragments[buf.windex].tdata, bs...)
+		if len(buf.fragments[buf.windex].payload)+len(bs) <= buf.avail(buf.windex) {
+			buf.fragments[buf.windex].payload = append(buf.fragments[buf.windex].payload, bs...)
 			buf.Size += len(bs)
 			return buf
 		}
 
-		fill := buf.avail(buf.windex) - len(buf.fragments[buf.windex].tdata)
-		buf.fragments[buf.windex].tdata = append(buf.fragments[buf.windex].tdata, bs[:fill]...)
+		fill := buf.avail(buf.windex) - len(buf.fragments[buf.windex].payload)
+		buf.fragments[buf.windex].payload = append(buf.fragments[buf.windex].payload, bs[:fill]...)
 		buf.Size += fill
 		bs = bs[fill:]
 		buf.windex++
@@ -174,11 +174,11 @@ func (buf *Buffer) PeekByte() (b byte, err error) {
 	if buf.Size == 0 {
 		return 0, ErrorInSufficientData
 	}
-	return buf.fragments[buf.index].tdata[buf.pos], nil
+	return buf.fragments[buf.index].payload[buf.pos], nil
 }
 
 func (buf *Buffer) avail(index int) int {
-	return cap(buf.fragments[index].tdata) - buf.lenChecksum
+	return cap(buf.fragments[index].payload) - buf.lenChecksum
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -193,7 +193,7 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 	result = dest
 	wanted := len(dest)
 
-	n := copy(dest[:wanted], buf.fragments[buf.index].tdata[buf.pos:buf.avail(buf.index)])
+	n := copy(dest[:wanted], buf.fragments[buf.index].payload[buf.pos:buf.avail(buf.index)])
 	buf.Size -= n
 	buf.pos += n
 	if buf.pos >= buf.avail(buf.index) {
@@ -206,7 +206,7 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 
 	dest = dest[n:]
 	for {
-		n = copy(dest, buf.fragments[buf.index].tdata[:buf.avail(buf.index)])
+		n = copy(dest, buf.fragments[buf.index].payload[:buf.avail(buf.index)])
 		buf.Size -= n
 		dest = dest[n:]
 		if len(dest) == 0 {
@@ -234,7 +234,7 @@ func appendSize4(dest []byte, le int) []byte {
 	return append(dest, Slice(Ptr(&l), unsafe.Sizeof(l))...)
 }
 
-// Buffer version append Buffer.tdata only with check data cap
+// Buffer version append Buffer.payload only with check data cap
 // call when you add new data to the buffer.
 func (buf *Buffer) appendSize2(le int) *Buffer {
 	l := int16(le)
@@ -264,7 +264,7 @@ func (buf *Buffer) updateSize(index, pos, value int) {
 	l := int32(value)
 	s := Slice(Ptr(&l), unsafe.Sizeof(l))
 	for i := 0; i < len(s); i++ {
-		buf.fragments[index].tdata[pos] = s[i]
+		buf.fragments[index].payload[pos] = s[i]
 		pos++
 		if pos >= buf.avail(index) {
 			pos = 0
@@ -309,13 +309,13 @@ func (buf *Buffer) checkDumpSize() (sizet int, sizea int, err error) {
 
 // return fragment id with error if lost
 func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
-	if frag == nil || len(frag.tdata) == 0 {
+	if frag == nil || len(frag.Data) == 0 {
 		return buf.Wanted(), ErrorInvalidTSSDData
 	}
 	if buf.schema == nil {
 		buf.fragments = make(map[int]*Fragment)
 		buf.schema = &frag.Schema
-		buf.heads = frag.Data[0 : len(frag.Data)-len(frag.tdata)]
+		buf.heads = frag.Data[0 : len(frag.Data)-len(frag.payload)]
 		buf.lenChecksum = 8 + len(HashFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
 	}
 
@@ -330,12 +330,12 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 	fid = max(-fid, fid)             //Abs
 
 	if _, ok := buf.fragments[fid-1]; ok {
-		buf.Size -= len(buf.fragments[fid-1].tdata)
+		buf.Size -= len(buf.fragments[fid-1].payload)
 	}
 
 	//we always copy it, even repeat push
 	buf.fragments[fid-1] = frag
-	buf.Size += len(frag.tdata)
+	buf.Size += len(frag.payload)
 
 	return buf.Wanted(), nil
 }
@@ -368,13 +368,13 @@ func (buf *Buffer) Merge() *Buffer {
 		0: &Fragment{
 			Header: frags[0].Header,
 			Schema: frags[0].Schema,
-			Data:   make([]byte, 0, len(buf.fragments[0].Data)-len(buf.fragments[0].tdata)+buf.Size),
+			Data:   make([]byte, 0, len(buf.fragments[0].Data)-len(buf.fragments[0].payload)+buf.Size),
 		},
 	}
 	frag := buf.fragments[0] //new one
-	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].tdata)
+	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].payload)
 	frag.Data = append(frag.Data, frags[0].Data[:headLen]...)
-	frag.tdata = frag.Data[headLen:headLen]
+	frag.payload = frag.Data[headLen:headLen]
 	buf.Size = 0
 	buf.windex = 0
 	buf.MTU = cap(frag.Data)
@@ -383,7 +383,7 @@ func (buf *Buffer) Merge() *Buffer {
 	}
 
 	for i := 0; i < len(frags); i++ {
-		buf.Append(frags[i].tdata)
+		buf.Append(frags[i].payload)
 	}
 	buf.finish()
 	return buf
@@ -408,5 +408,5 @@ func (buf *Buffer) Split(mtu int) *Buffer {
 	buf.fragments = make(map[int]*Fragment)
 
 	// append all data back
-	return buf.Append(frag.tdata)
+	return buf.Append(frag.payload)
 }
