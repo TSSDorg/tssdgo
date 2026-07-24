@@ -430,9 +430,22 @@ func toTSSDType(kind reflect.Kind) (typee int8) {
 	return typee
 }
 
-func (ti *typeInfo) setType(typ int8) {
+func (ti *typeInfo) updateType(typ int8, pos int) {
 	ti.Type = typ
+	ti.root.stype[pos] = byte(typ)
+}
+
+// set type
+// append to types
+// return the prevous size, we can update it later if needed
+func (ti *typeInfo) setType(typ int8) (pos int) {
+	ti.Type = typ
+	pos = len(ti.root.stype)
 	ti.root.stype = append(ti.root.stype, byte(ti.Type))
+	if typ == Ttime {
+		ti.root.stype = append(ti.root.stype, byte(Tstring)) //for Ttime, add subtype
+	}
+	return pos
 }
 
 func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
@@ -499,10 +512,10 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			j++
 		}
 		ti.info = ti.info[:j]
-		appendSize2(ti.root.stype[:pos], j)
+		appendSize2(ti.root.stype[:pos], j) // update fields num to skip Flat self
 
 	case reflect.Array, reflect.Slice: //for array, the memorry is continus:  &array==&array[0]
-		ti.setType(Tarray)
+		pos := ti.setType(Tarray)
 		ti.save = (*typeInfo).sliceSave
 		ti.dump = (*typeInfo).sliceDump
 		ti.size = value.Len()
@@ -518,7 +531,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		}
 
 		if ti.info[0].isFixedLength {
-			ti.setType(Tarraym)
+			ti.updateType(Tarraym, pos)
 			ti.save = (*typeInfo).mergeSliceSave
 			ti.dump = (*typeInfo).mergeSliceDump
 			ti.mapSave, ti.mapDump = (*typeInfo).mapMergeSliceValueSave, (*typeInfo).mapMergeSliceValueDump

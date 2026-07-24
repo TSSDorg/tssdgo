@@ -44,6 +44,18 @@ type Equaler interface {
 	Equal(Equaler) bool
 }
 
+func TimeSliceEqual(a, b []time.Time) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !a[i].Equal(b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func MapEqual[K comparable, T Equaler](a, b map[K]T) bool {
 	if len(a) != len(b) {
 		return false

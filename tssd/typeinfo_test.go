@@ -354,29 +354,50 @@ func TestEmptySlice(t *testing.T) {
 func TestNestStructArray(t *testing.T) {
 
 	type sin struct {
-		I int
+		I  uint32
+		Ts []time.Time
 		//str string
 		Ss []string
 	}
 
 	type sout struct {
-		I    []int
+		I    []int16
 		Nest [4]sin
-		//strs []string
+		Strs []string
 	}
+	now := time.Now()
 	in1 := sout{
-		[]int{10, 123},
+		[]int16{10, 123},
 		//[2]sin{{1, "hello"}, {2, ""}},
-		[4]sin{{123, []string{""}}, {2, []string{"", "abc"}}, {0, []string{"", ""}}, {234, []string{"abc", ""}}},
-		//[]string{"abc", "", "abcd", "a"},
+		[4]sin{{123, []time.Time{now}, []string{""}}, {2, []time.Time{now, now}, []string{"", "abc"}}, {0, []time.Time{now}, []string{"", ""}}, {234, []time.Time{now}, []string{"abc", ""}}},
+		[]string{"abc", "", "abcd", "a"},
 	}
 	fmt.Println("Test TestNestStructArray begin ~~~~~~~~~~~~~~")
 	var s2 sout
 	container := parse(in1)
+
+	is := []int8{Tobject, 3, 0, Tarraym, Tint16, Tarray, Tobject, 3, 0, Tuint32, Tarray, Ttime, Tstring, Tarray, Tstring, Tarray, Tstring}
+	bs := make([]byte, len(is))
+	for i := 0; i < len(is); i++ {
+		bs[i] = byte(is[i])
+	}
+	if !SliceEqual(container.types(), bs) {
+		fmt.Println("Types:", container.types(), ", bs:", bs)
+		t.Errorf("Test TestNestStructArray types fail")
+	}
 	n, _ := container.marshal(&in1)
 	fmt.Println("in1:", in1)
 
 	container.unmarshal(n, &s2)
+	//we cmp time first
+	for i := 0; i < len(in1.Nest); i++ {
+		if !TimeSliceEqual(in1.Nest[i].Ts, s2.Nest[i].Ts) {
+			t.Errorf("Test TestNestStructArray time err")
+		}
+		in1.Nest[i].Ts = nil
+		s2.Nest[i].Ts = nil
+	}
+
 	if !reflect.DeepEqual(in1, s2) {
 		fmt.Println("out:", s2)
 		t.Errorf("Test TestNestStructArray err ")
@@ -446,6 +467,30 @@ func TestSimpleTime(t *testing.T) {
 	fmt.Println("tt:", tt.Format(time.RFC3339Nano))
 	fmt.Println("v2:", v2.Format(time.RFC3339Nano))
 	if !v2.Equal(tt) {
+		t.Error("TestSimpleTime failed")
+	}
+}
+
+func TestSimpleTimeArray(t *testing.T) {
+
+	type st struct {
+		Tt []time.Time
+	}
+
+	tt := time.Now()
+	container := parse(st{})
+
+	s1 := st{
+		[]time.Time{tt, tt},
+	}
+
+	b, _ := container.marshal(&s1)
+
+	var s2 st
+	container.unmarshal(b, &s2)
+	fmt.Println("s1:", s1)
+	fmt.Println("s2:", s2)
+	if !s1.Tt[0].Equal(s2.Tt[0]) || !s1.Tt[1].Equal(s2.Tt[1]) {
 		t.Error("TestSimpleTime failed")
 	}
 }
