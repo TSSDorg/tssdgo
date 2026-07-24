@@ -481,8 +481,10 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		num := fields.NumField()
 
 		ti.setType(Tobject)
-		//we append struct's fields to validate
-		ti.root.stype = appendSize2(ti.root.stype, len(ti.info))
+
+		//we append struct's fields to validate, but exclude Flat self
+		pos := len(ti.root.stype)
+		ti.root.stype = appendSize2(ti.root.stype, num)
 
 		ti.info = make([]typeInfo, num)
 		var j = 0
@@ -497,6 +499,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 			j++
 		}
 		ti.info = ti.info[:j]
+		appendSize2(ti.root.stype[:pos], j)
 
 	case reflect.Array, reflect.Slice: //for array, the memorry is continus:  &array==&array[0]
 		ti.setType(Tarray)
