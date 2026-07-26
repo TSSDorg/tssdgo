@@ -116,19 +116,19 @@ func handleEchoRequest(rw io.ReadWriter) error {
 	request, err := handleRequestRecv(rw)
 	if err != nil || request == nil {
 		fmt.Println("Error occurred while reading request")
-		return errors.New("failed to receive schema")
+		return errors.New("failed to receive request")
 	}
 
 	switch {
 	case request.Fid <= 0:
 		// request all fragments
-		// get the data from Buffer.Fragments()[i].Data
-		for i := 0; i < len(nbuf.Fragments()); i++ {
-			n, err := rw.Write(nbuf.Fragments()[i].Data)
-			fmt.Println("writing:", err, n, nbuf.Size, len(nbuf.Fragments()[i].Data), nbuf.Fragments()[i].Data)
-		}
+		// you can call Buffer.WriteFragments to write
+		n, err := nbuf.WriteFragments(rw)
+		fmt.Println("Written bytes:", n, err)
 	case request.Fid > 0 && int(request.Fid) <= len(nbuf.Fragments()):
-		n, err := rw.Write(nbuf.Fragments()[request.Fid-1].Data)
+		n, err := nbuf.Fragments()[request.Fid-1].Write(rw)
+		// or you can visit nbuf.Fragments()[request.Fid-1].Data and write directly
+		// n, err := rw.Write(nbuf.Fragments()[request.Fid-1].Data)
 		fmt.Println("written fragment: ", request.Fid, " data len:", n, err)
 	default:
 		fmt.Println("Invalid fragment number:", request.Fid)
