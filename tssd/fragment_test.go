@@ -13,8 +13,8 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 	data = append(append(make([]byte, 0, 1024), []byte("something")...), data...)
 
 	var frag Fragment
-	remaining, err := (&frag).Unmarshal(append(data, []byte("extra")...))
-	if err != nil {
+	more, remaining, err := (&frag).Unmarshal(append(data, []byte("extra")...))
+	if err != nil || more != 0 {
 		t.Fatalf("Unmarshal returned error: %v", err)
 	}
 	if string(remaining) != "extra" {
@@ -44,8 +44,8 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 
 func TestFragmentUnmarshalRejectsShortInput(t *testing.T) {
 	var frag Fragment
-	_, err := frag.Unmarshal([]byte(MAGIC))
-	if !errors.Is(err, ErrorInSufficientData) {
+	more, _, err := frag.Unmarshal([]byte(MAGIC))
+	if !errors.Is(err, ErrorInSufficientData) || more == 0 {
 		t.Fatalf("expected ErrorInSufficientData, got %v", err)
 	}
 }
@@ -55,7 +55,7 @@ func TestFragmentUnmarshalRejectsInvalidMagic(t *testing.T) {
 	data[0] = 'X'
 
 	var frag Fragment
-	_, err := frag.Unmarshal(data)
+	_, _, err := frag.Unmarshal(data)
 	if !errors.Is(err, ErrorInvalidTSSDData) {
 		t.Fatalf("expected ErrorInvalidTSSDData, got %v", err)
 	}
@@ -66,7 +66,7 @@ func TestFragmentUnmarshalRejectsChecksumMismatch(t *testing.T) {
 	data[len(data)-1] ^= 1
 
 	var frag Fragment
-	_, err := frag.Unmarshal(data)
+	_, _, err := frag.Unmarshal(data)
 	if !errors.Is(err, ErrorTSSDDataChecksumFailure) {
 		t.Fatalf("expected ErrorTSSDDataChecksumFailure, got %v", err)
 	}
@@ -77,7 +77,7 @@ func TestFragmentUnmarshalDisableChecksum(t *testing.T) {
 	data[len(data)-9] ^= 1
 
 	var frag Fragment
-	_, err := frag.Unmarshal(data)
+	_, _, err := frag.Unmarshal(data)
 	if err != nil {
 		t.Fatalf("disableChecksum but got ErrorTSSDDataChecksumFailure")
 	}
@@ -91,7 +91,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
 
 	schema := Schema{Fragment: 1, Hash: "hash", TID: "tid", Extent: "extent"}
-	if err := schema.Marshal(buf); err != nil {
+	if err := schema.marshal(buf); err != nil {
 		t.Fatalf("schema marshal failed: %v", err)
 	}
 

@@ -22,51 +22,64 @@ type School struct {
 }
 
 type Student struct {
-	tssd.Flat[Student, *Student]    // add Flat Base here
-	ID      int64
-	Name    []string
-	Age     uint8
-	Value   float64
-	Levels  []int
-	IsMale  bool
-	Birth   time.Time
-	Address []string
-	Mail    string
-	Schools []School
-	Courses map[string]Course
+	tssd.Flat[Student, *Student] // add Flat Base here
+	ID                           int64
+	Name                         []string
+	Age                          uint8
+	Value                        float64
+	Levels                       []int
+	IsMale                       bool
+	Birth                        time.Time
+	Address                      []string
+	Mail                         string
+	Schools                      []School
+	Courses                      map[string]Course
 }
 
 const STUDENT_GROUP = "Student"
+
 // Version and Group is the two method you should implement
 func (this *Student) Version() string { return "V1" }
 func (this *Student) Group() string   { return STUDENT_GROUP }
 
-//make sure register before Marshal or Unmarshal
-func init() {
-	tssd.Register(&Student{})
+// demo: simple request with a fragment
+type Request struct {
+	tssd.Flat[Request, *Request]
+	Fid int32
+	// bla, bla, maybe you need send something others
 }
 
-func handleSchemaRecv(rw io.ReadWriter) *tssd.Schema {
-	bs := make([]byte, 1024)
-	nbuf := &tssd.Buffer{}
-	for {
-		n, err := rw.Read(bs)
-		if err != nil || n == 0 {
-			fmt.Println("Error occurred while reading:", err)
-			return nil
-		}
-		nbuf.Append(bs[:n])
+func (this *Request) Version() string { return "V1" }
+func (this *Request) Group() string   { return "Request" }
 
-		schema := &tssd.Schema{}
-		if err := schema.Unmarshal(nbuf); err == nil {
-			return schema
-		}
+// make sure register before Marshal or Unmarshal
+func init() {
+	tssd.Register(&Student{})
+	tssd.Register(&Request{})
+}
+
+func handleRequestRecv(rr io.Reader) (*Request, error) {
+	rBuf := &tssd.Buffer{}
+
+	if err := rBuf.ReadFragments(rr); err != nil {
+		fmt.Println("Error occurred while read unmarshalling fragments:", err)
+		return nil, err
 	}
+
+	// When Buffer is complete, you can Unmarshal to a object
+	var req Request
+	if err := tssd.UnmarshalTo(rBuf, &req); err != nil {
+		fmt.Println("Error occurred while unmarshalling:", err)
+		return nil, err
+	}
+
+	fmt.Println("Received full student:", req)
+	return &req, nil
 }
 
 var nbuf *tssd.Buffer
 
-func handleEcho(rw io.ReadWriter) error {
+func handleEchoRequest(rw io.ReadWriter) error {
 	now := time.Now()
 	if nbuf == nil {
 		nbuf = &tssd.Buffer{
@@ -100,82 +113,63 @@ func handleEcho(rw io.ReadWriter) error {
 		}
 	}
 
-	schema := handleSchemaRecv(rw)
-	if schema == nil {
-		fmt.Println("Error occurred while reading schema")
-		return errors.New("failed to receive schema")
+	request, err := handleRequestRecv(rw)
+	if err != nil || request == nil {
+		fmt.Println("Error occurred while reading request")
+		return errors.New("failed to receive request")
 	}
-	fmt.Println("Received schema:", schema)
 
 	switch {
-	case schema.Fragment <= 0:
-
-		// get the data from Buffer.Fragments()[i].Data
-		for i := 0; i < len(nbuf.Fragments()); i++ {
-			n, err := rw.Write(nbuf.Fragments()[i].Data)
-			fmt.Println("writing:", err, n, nbuf.Size, len(nbuf.Fragments()[i].Data), nbuf.Fragments()[i].Data)
-		}
-	case schema.Fragment > 0 && schema.Fragment <= int16(len(nbuf.Fragments())):
-		rw.Write(nbuf.Fragments()[schema.Fragment-1].Data)
+	case request.Fid <= 0:
+		// request all fragments
+		// you can call Buffer.WriteFragments to write
+		n, err := nbuf.WriteFragments(rw)
+		fmt.Println("Written bytes:", n, err)
+	case request.Fid > 0 && int(request.Fid) <= len(nbuf.Fragments()):
+		n, err := nbuf.Fragments()[request.Fid-1].Write(rw)
+		// or you can visit nbuf.Fragments()[request.Fid-1].Data and write directly
+		// n, err := rw.Write(nbuf.Fragments()[request.Fid-1].Data)
+		fmt.Println("written fragment: ", request.Fid, " data len:", n, err)
 	default:
-		fmt.Println("Invalid fragment number:", schema.Fragment)
+		fmt.Println("Invalid fragment number:", request.Fid)
 	}
 	return nil
 }
 
-// client
-func handleFragmentRecv(rw io.ReadWriter, bs []byte) ([]byte, *tssd.Fragment) {
-	var b [1024]byte
-	frag := &tssd.Fragment{}
-	var err error
-	for {
-		if len(bs) > 0 {
-			// read or recv Data, then Fragment.Unmarshal
-			bs, err = frag.Unmarshal(bs)
-			if err == nil {
-				fmt.Println("Received fragment:", frag.Fragment, " with length:", len(frag.Data))
-				return bs, frag
-			}
-			if err != nil && errors.Is(err, tssd.ErrorInSufficientData) {
-				fmt.Println("Error occurred while unmarshalling:", err)
-				return bs, nil
-			}
-		}
-		n, err := rw.Read(b[:])
-		if err != nil || n == 0 {
-			fmt.Println("Error occurred while reading:", err)
-			return bs, nil
-		}
-		bs = append(bs, b[:n]...)
+func sendRequest(fid int, wr io.Writer) error {
+	wBuf := &tssd.Buffer{}
+	request := &Request{
+		Fid: int32(fid),
 	}
+	// marshal request into a Buffer
+	// then you got the data:  Buffer.Fragments()[i].Data
+	if err := tssd.MarshalTo(request, wBuf); err != nil {
+		fmt.Println("Error occurred while marshalling request:", err)
+		return err
+	}
+
+	n, err := wBuf.WriteFragments(wr)
+	if err != nil {
+		fmt.Println("Write request err:", err, ", written:", n)
+		return err
+	}
+	fmt.Println("Write request written:", n)
+	return nil
 }
 
 func query(rw io.ReadWriter) {
-	schema := &tssd.Schema{}
 
-	cBuf := &tssd.Buffer{}
-	schema.Marshal(cBuf)
-	rw.Write(cBuf.Fragments()[0].Data)
+	sendRequest(0, rw)
 
-	fBuf := &tssd.Buffer{}
-
-	bs := make([]byte, 0, 1024)
-	frag := &tssd.Fragment{}
-	// Buffer.Wanted will return the Fragment missing
-	// or return 0 if Fragments complete
-	for fBuf.Wanted() > 0 {
-		bs, frag = handleFragmentRecv(rw, bs)
-		if frag == nil {
-			fmt.Println("Error occurred while receiving fragment")
-			return
-		}
-		// receive and unmarshal fragment, then push into a Buffer
-		fBuf.Push(frag)
+	rBuf := &tssd.Buffer{}
+	if err := rBuf.ReadFragments(rw); err != nil {
+		fmt.Println("Error occurred while read unmarshalling fragments:", err)
+		return
 	}
 
 	// When Buffer is complete, you can Unmarshal to a object
 	var stu Student
-	if err := tssd.UnmarshalTo(fBuf, &stu); err != nil {
+	if err := tssd.UnmarshalTo(rBuf, &stu); err != nil {
 		fmt.Println("Error occurred while unmarshalling:", err)
 		return
 	}
@@ -183,21 +177,23 @@ func query(rw io.ReadWriter) {
 	fmt.Println("Received full student:", stu)
 
 	// if you find Fragment damaged, query it again
-	// we simple send a schema, you should design your protocol to interaction with you server
-	schema.Fragment = 2
-	schema.Marshal(cBuf.Clear())
-	rw.Write(cBuf.Fragments()[0].Data)
-	fmt.Println("send schema:", cBuf.Fragments()[0].Data)
+	// we request Fid 2
+	sendRequest(2, rw)
 
-	bs, frag = handleFragmentRecv(rw, bs)
-	if frag == nil {
-		fmt.Println("Error occurred while receiving fragment")
+	frag := new(tssd.Fragment)
+	//bio may remain some data thtat we need
+	//so reuse the previous one
+	if err := frag.Read(rw); err != nil {
 		return
 	}
-	fBuf.Push(frag)
+
+	//push again
+	if _, err := rBuf.Push(frag); err != nil {
+		return
+	}
 
 	var stu2 Student
-	if err := tssd.UnmarshalTo(fBuf, &stu2); err != nil {
+	if err := tssd.UnmarshalTo(rBuf, &stu2); err != nil {
 		fmt.Println("Error occurred while unmarshalling:", err)
 		return
 	}

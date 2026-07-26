@@ -60,7 +60,7 @@ func handleConn(conn net.Conn) {
 
 	fmt.Fprintln(conn, "welcome to tcp echo server")
 	for {
-		if err := handleEcho(conn); err != nil {
+		if err := handleEchoRequest(conn); err != nil {
 			fmt.Fprintf(os.Stderr, "echo error: %v\n", err)
 			return
 		}
