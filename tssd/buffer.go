@@ -2,6 +2,7 @@ package tssd
 
 import (
 	//"fmt"
+	"io"
 	"unsafe"
 )
 
@@ -411,4 +412,32 @@ func (buf *Buffer) Split(mtu int) *Buffer {
 
 	// append all data back
 	return buf.Append(frag.payload)
+}
+
+
+// read all splited fragments from a bufio reader
+func (buf *Buffer) ReadFragments(rd io.Reader) error {
+	for buf.Wanted() != 0 {
+		frag := &Fragment{}
+		if err := frag.Read(rd); err != nil {
+			return err
+		}
+		if _, err := buf.Push(frag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// write all fragments
+// return bytes written
+func (buf *Buffer) WriteFragments(wr io.Writer) (n int, err error) {
+	for i := 0; i < len(buf.fragments); i++ {
+		l, err := buf.fragments[i].Write(wr)
+		n += l
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
 }
