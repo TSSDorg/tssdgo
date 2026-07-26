@@ -415,7 +415,7 @@ func (buf *Buffer) Split(mtu int) *Buffer {
 }
 
 
-// read all splited fragments from a bufio reader
+// read all splited fragments from a reader
 func (buf *Buffer) ReadFragments(rd io.Reader) error {
 	for buf.Wanted() != 0 {
 		frag := &Fragment{}
