@@ -53,7 +53,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	}
 	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
 	//we will try to calc the real size of Checksum
-	buf.lenChecksum = 8 + len(ChecksumFunc(buf.heads)) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
+	buf.lenChecksum = TSSD_TARRAYM_HEAD_LENGTH + len(ChecksumFunc(buf.heads))
 	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - buf.lenChecksum
 	nbuf.appendSize4(avail + TSSD_SIZEA_LENGTH) //reserve sizet
 	nbuf.appendSize2(avail)
