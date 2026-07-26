@@ -91,7 +91,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
 
 	schema := Schema{Fragment: 1, Hash: "hash", TID: "tid", Extent: "extent"}
-	if err := schema.Marshal(buf); err != nil {
+	if err := schema.marshal(buf); err != nil {
 		t.Fatalf("schema marshal failed: %v", err)
 	}
 

@@ -145,7 +145,7 @@ func (frag *Fragment) Unmarshal(input []byte) (more int, remain []byte, err erro
 		return 0, data, fmt.Errorf("%w [schema type %d invalid]", ErrorInvalidTSSDData, b)
 	}
 
-	err = (&frag.Schema).Unmarshal(buf)
+	err = (&frag.Schema).unmarshal(buf)
 	if err != nil {
 		if errors.Is(err, ErrorInSufficientData) {
 			return TSSD_FRAGMENT_MIN_HEADER_SIZE, nil, err
@@ -253,7 +253,7 @@ func init() {
 	schemaTypeInfo = parse(Schema{})
 }
 
-func (this *Schema) Marshal(buf *Buffer) error {
+func (this *Schema) marshal(buf *Buffer) error {
 	//buf.Clear()
 	err := schemaTypeInfo.marshalTo(this, buf)
 	if err == nil && buf.Size > 0 {
@@ -262,7 +262,7 @@ func (this *Schema) Marshal(buf *Buffer) error {
 	return err
 }
 
-func (this *Schema) Unmarshal(buf *Buffer) error {
+func (this *Schema) unmarshal(buf *Buffer) error {
 	return schemaTypeInfo.unmarshal(buf, this)
 }
 

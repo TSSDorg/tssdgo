@@ -47,7 +47,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	nbuf.Append([]byte(MAGIC))
 	nbuf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
 
-	err := buf.schema.Marshal(nbuf)
+	err := buf.schema.marshal(nbuf)
 	if err != nil {
 		return err
 	}
