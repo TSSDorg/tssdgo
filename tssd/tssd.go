@@ -142,7 +142,7 @@ func (frag *Fragment) Unmarshal(input []byte) (more int, remain []byte, err erro
 
 	// Tschema
 	if b, _ := buf.ReadByte(); b != byte(Tschema) {
-		return 0, data, fmt.Errorf("%w [schema type %d invalid]", ErrorInvalidTSSDData, b)
+		return 0, nil, fmt.Errorf("%w [schema type %d invalid]", ErrorInvalidTSSDData, b)
 	}
 
 	err = (&frag.Schema).unmarshal(buf)
