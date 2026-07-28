@@ -448,7 +448,7 @@ func (ti *typeInfo) setType(typ int8) (pos int) {
 	return pos
 }
 
-func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
+func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 
 	field := reflect.TypeOf(intf)
 	value := reflect.ValueOf(intf)
@@ -459,6 +459,8 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 	if strings.HasPrefix(field.String(), TSSD_FLAT_KIND) {
 		return nil
 	}
+
+	ti.root.stype = append(ti.root.stype, typs...) //some typ need add before children
 
 	switch value.Kind() {
 	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -495,7 +497,8 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 
 		ti.setType(Tobject)
 
-		//we append struct's fields to validate, but exclude Flat self
+		// we append struct's fields to validate, but exclude Flat self
+		// we only add once, don't put it in loop
 		pos := len(ti.root.stype)
 		ti.root.stype = appendSize2(ti.root.stype, num)
 
@@ -503,7 +506,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		var j = 0
 		for i := 0; i < num; i++ {
 			ti.info[j].root = ti.root
-			if (&ti.info[j]).doParse(value.Field(i).Interface()) == nil {
+			if (&ti.info[j]).doParse(value.Field(i).Interface(), nil) == nil {
 				continue
 			}
 
@@ -525,7 +528,7 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		ti.info = make([]typeInfo, 1)
 		ti.info[0].root = ti.root
 		v := value.Type().Elem()
-		if (&ti.info[0]).doParse(reflect.New(v).Elem().Interface()) == nil {
+		if (&ti.info[0]).doParse(reflect.New(v).Elem().Interface(), nil) == nil {
 			ti.info = ti.info[:0]
 			return ti
 		}
@@ -547,10 +550,10 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		v := value.Type().Elem()
 		ti.info[0].root, ti.info[1].root = ti.root, ti.root
 		index := 0
-		if (&ti.info[index]).doParse(reflect.New(k).Elem().Interface()) != nil {
+		if (&ti.info[index]).doParse(reflect.New(k).Elem().Interface(), []byte{byte(Tdictk)}) != nil {
 			index++
 		}
-		if (&ti.info[index]).doParse(reflect.New(v).Elem().Interface()) != nil {
+		if (&ti.info[index]).doParse(reflect.New(v).Elem().Interface(), []byte{byte(Tdictv)}) != nil {
 			index++
 		}
 		ti.info = ti.info[:index]
@@ -561,7 +564,6 @@ func (ti *typeInfo) doParse(intf interface{}) *typeInfo {
 		//return nil
 	}
 	return ti
-
 }
 
 func parse(intf interface{}) (ti *typeInfo) {
@@ -569,5 +571,5 @@ func parse(intf interface{}) (ti *typeInfo) {
 	ti = &typeInfo{stype: make([]byte, 0, 1024)}
 	ti.root = ti
 
-	return ti.doParse(intf)
+	return ti.doParse(intf, nil)
 }
