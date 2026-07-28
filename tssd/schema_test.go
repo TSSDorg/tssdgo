@@ -231,6 +231,7 @@ func (this *TestStruct2) Version() string {
 type TestStruct3 struct {
 	TestStruct
 	tssd.Flat[TestStruct3, *TestStruct3]
+	M map[string]TestStruct2
 }
 
 func (this *TestStruct3) Group() string {
@@ -269,7 +270,7 @@ func TestTypesExcludeFlat(t *testing.T) {
 
 	v4 := TestStruct3{}
 	t4 := v4.Types()
-	expect3 := []int8{tssd.Tobject, 1, 0, tssd.Tobject, 2, 0, tssd.Tstring, tssd.Tint16}
+	expect3 := []int8{tssd.Tobject, 2, 0, tssd.Tobject, 2, 0, tssd.Tstring, tssd.Tint16, tssd.Tdict, tssd.Tdictk, tssd.Tstring, tssd.Tdictv, tssd.Tobject, 2, 0, tssd.Tobject, 2, 0, tssd.Tstring, tssd.Tint16, tssd.Tint8}
 	if !tssd.TypesEqual(t4, expect3) {
 		fmt.Println("TestTypesExcludeFlat: ", t4)
 		t.Errorf("TestTypesExcludeFlat test4 fail")

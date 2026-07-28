@@ -1143,3 +1143,47 @@ func TestTssdPrint(t *testing.T) {
 		t.Error("unmarsha struct failed")
 	}
 }
+
+func TestTssdTypes(t *testing.T) {
+	type st[T comparable] struct {
+		Value T
+	}
+
+	if !TypesEqual(parse(st[int8]{}).types(), []int8{Tobject, 1, 0, Tint8}) {
+		t.Error("parse int8 types error")
+	}
+	if !TypesEqual(parse(st[uint64]{}).types(), []int8{Tobject, 1, 0, Tuint64}) {
+		t.Error("parse uint64 types error")
+	}
+	if !TypesEqual(parse(st[float64]{}).types(), []int8{Tobject, 1, 0, Tfloat64}) {
+		t.Error("parse st float64 types error")
+	}
+	type st2[T, T2 comparable] struct {
+		Value  T
+		Value2 T2
+	}
+	if !TypesEqual(parse(st2[uint8, int32]{}).types(), []int8{Tobject, 2, 0, Tuint8, Tint32}) {
+		t.Error("parse st2 uint8/int32 types error")
+	}
+	if !TypesEqual(parse(st2[float32, bool]{}).types(), []int8{Tobject, 2, 0, Tfloat32, Tbool}) {
+		t.Error("parse st2 float32/bool types error")
+	}
+	type st3 struct {
+		Value  string
+		Value2 []int16
+		T      time.Time
+	}
+	if !TypesEqual(parse(st3{}).types(), []int8{Tobject, 3, 0, Tstring, Tarraym, Tint16, Ttime, Tstring}) {
+		t.Error("parse st3 types error")
+	}
+
+	type st4 struct {
+		Value2 []string
+		T      []time.Time
+		M      map[string]st3
+	}
+	if !TypesEqual(parse(st4{}).types(), []int8{Tobject, 3, 0, Tarray, Tstring, Tarray, Ttime, Tstring, Tdict, Tdictk, Tstring, Tdictv, Tobject, 3, 0, Tstring, Tarraym, Tint16, Ttime, Tstring}) {
+		t.Error("parse st4 types error")
+	}
+
+}
