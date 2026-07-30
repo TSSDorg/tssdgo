@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
-	"testing"
 	"strings"
+	"testing"
 	"time"
 	"unsafe"
 	//"strconv"
@@ -703,8 +703,6 @@ func TestParse(t *testing.T) {
 	}
 }
 
-
-
 func testBody[T comparable](in T, t *testing.T) {
 	ti := parse(in)
 	dest, _ := ti.marshal(Ptr(&in))
@@ -1071,10 +1069,10 @@ func TestTssdMap(t *testing.T) {
 }
 
 type stx struct {
-	I uint16
-	BIgnore string   `tssd:"-,"`  // tags ignore
-	S string
-	a int32  // unexported
+	I       uint16
+	BIgnore string `tssd:"-,"` // tags ignore
+	S       string
+	a       int32 // unexported
 }
 
 func TestTssdMapStructSlice(t *testing.T) {
@@ -1102,10 +1100,10 @@ func TestTssdMapStructSlice(t *testing.T) {
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
 
 	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
-				ign := strings.HasSuffix(p.GoString(), "Ignore")
-				fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
-				return ign
-			}, cmp.Ignore())
+		ign := strings.HasSuffix(p.GoString(), "Ignore")
+		fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
+		return ign
+	}, cmp.Ignore())
 
 	fmt.Println("mp:", mp)
 	fmt.Println("j:", j)
@@ -1158,8 +1156,13 @@ func TestTssdPrint(t *testing.T) {
 		t.Error("unmarshal struct failed:", s, j, err)
 	}
 	//fmt.Println("unmarshal struct s, j:", s, j)
+	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
+		ign := strings.HasSuffix(p.GoString(), "Ignore")
+		fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
+		return ign
+	}, cmp.Ignore())
 
-	if err != nil || !cmp.Equal(s, j, cmpopts.IgnoreUnexported(stx{})) {
+	if err != nil || !cmp.Equal(s, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt) {
 		t.Error("cmp equal fail")
 	}
 }
@@ -1208,49 +1211,151 @@ func TestTssdTypes(t *testing.T) {
 
 }
 
-func TestUnexported(t *testing.T) {
+var ignoreTagOpt = cmp.FilterPath(func(p cmp.Path) bool {
+	ign := strings.HasSuffix(p.GoString(), "Ignore")
+	return ign
+}, cmp.Ignore())
 
-	type st1 struct {
-		Value int16
-		a     string
-		BIgnore    int32
-	}
-/*
-	type st struct {
-		st1
-		value int8
-	}
-*/
-	//parse(st{})
+func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
 
-	s1 := st1 {
-		1,
-		"abc",
-		2,
-	}
+	//ti := parse(in)
+	value := reflect.ValueOf(in)
+	v := value.Type().Elem()
+	ti := parse(reflect.New(v).Elem().Interface())
 
-	s2 := st1 {
-		1,
-		"d",
-		5,
+	dest, err := ti.marshal(value.UnsafePointer())
+	if err != nil {
+		t.Error("doMarshalUnmarshal marshal fail:", err)
+	}
+	if err = ti.unmarshal(dest, reflect.ValueOf(out).UnsafePointer()); err != nil {
+		t.Error("doMarshalUnmarshal unmarshal fail:", err)
 	}
 
-	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
-                if len(p) == 0 {
-                        return false
-                }
-                t := p[len(p)-1].Type()
-
-				ign := strings.HasSuffix(p.GoString(), "Ignore")
-				fmt.Println("=============ignoreTagOpt: ", t.String(), t.Name(), p.GoString(), ign)
-				return ign
-			}, cmp.Ignore())
-
-	fmt.Println("s1:", s1)
-	fmt.Println("s2:", s2)
-
-	if !cmp.Equal(s1, s2, cmpopts.IgnoreUnexported(st1{}), ignoreTagOpt) {
+	if !cmp.Equal(in, out, opts...) {
 		t.Error("cmp equal fail")
 	}
+}
 
+type stIgnoreTestIn struct {
+	Value   int16
+	a       string //unexp
+	BIgnore int32  `tssd:"xxx,-,yyy"`
+	B       byte
+}
+
+type stIgnoreTest struct {
+	AIgnore stIgnoreTestIn `tssd:"other,-,123"`
+	S       stIgnoreTestIn
+	unexp   int8
+	Str     string
+}
+
+func TestUnexportedAndIgnoreFields(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+	var s2 stIgnoreTestIn
+
+	doMarshalUnmarshal(t, &s1, &s2, cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsNest(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+
+	var s4 stIgnoreTest
+	doMarshalUnmarshal(t, &s3, &s4, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsSlice(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+
+	s4 := stIgnoreTest{
+		s1,
+		s2,
+		88,
+		"Hello world",
+	}
+
+	in := []stIgnoreTest{s3, s4}
+
+	var out []stIgnoreTest
+
+	doMarshalUnmarshal(t, &in, &out, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsMap(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+
+	s4 := stIgnoreTest{
+		s1,
+		s2,
+		88,
+		"Hello world",
+	}
+
+	in := map[string]stIgnoreTest{
+		"hello": s3,
+		"foo":   s4,
+	}
+
+	var out map[string]stIgnoreTest
+
+	doMarshalUnmarshal(t, &in, &out, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
 }
