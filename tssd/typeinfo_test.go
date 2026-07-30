@@ -40,7 +40,6 @@ func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
 	}
 }
 
-
 type S1 struct {
 	T   time.Time
 	V   int16
@@ -257,15 +256,7 @@ func TestNestStructSlice(t *testing.T) {
 	}
 	fmt.Println("Test TestNestStructSlice begin ~~~~~~~~~~~~~~")
 	var s2 sout
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println(in1)
-
-	container.unmarshal(n, &s2)
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(s2, len(s2.Nest))
-		t.Errorf("Test TestNestStructSlice err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestEmptySlice(t *testing.T) {
@@ -383,18 +374,7 @@ func TestMap(t *testing.T) {
 	s1.St.M2["wee2"] = "wefefe2"
 	s1.St.M2["we"] = "wefwereeefe"
 
-	container := parse(s1)
-	b, _ := container.marshal(&s1)
-
-	container.unmarshal(b, &s2)
-
-	fmt.Println("s2", s2)
-
-	//s2.i = 13
-
-	if !reflect.DeepEqual(s1, s2) {
-		t.Error("TestMap failed")
-	}
+	doMarshalUnmarshal(t, &s1, &s2)
 }
 
 func TestSimpleTime(t *testing.T) {
@@ -419,53 +399,26 @@ func TestSimpleTimeArray(t *testing.T) {
 	}
 
 	tt := time.Now()
-	container := parse(st{})
-
 	s1 := st{
-		[]time.Time{tt, tt},
+		[]time.Time{tt, tt.AddDate(-22, 1, 2)},
 	}
-
-	b, _ := container.marshal(&s1)
-
 	var s2 st
-	container.unmarshal(b, &s2)
-	fmt.Println("s1:", s1)
-	fmt.Println("s2:", s2)
-	if !s1.Tt[0].Equal(s2.Tt[0]) || !s1.Tt[1].Equal(s2.Tt[1]) {
-		t.Error("TestSimpleTime failed")
-	}
+
+	doMarshalUnmarshal(t, &s1, &s2)
 }
 
 func TestEmbedStruct(t *testing.T) {
-
 	v := TestStruct{V: 2, T: time.Now()}
 	v.S1.V = 3
-
-	fmt.Println(v)
-	container := parse(v)
-	b, _ := container.marshal(&v)
-
 	var v2 TestStruct
-	container.unmarshal(b, &v2)
-	if !v.T.Equal(v2.T) || v.S1.V != v2.S1.V {
-		t.Error("TestTime failed")
-	}
+	doMarshalUnmarshal(t, &v, &v2)
 }
 
 func TestTime(t *testing.T) {
-
 	v := TestStruct{V: 2, T: time.Now()}
 	v.S1.V = 3
-
-	fmt.Println(v)
-	container := parse(v)
-	b, _ := container.marshal(&v)
-
 	var v2 TestStruct
-	container.unmarshal(b, &v2)
-	if !v.T.Equal(v2.T) || v.S1.V != v2.S1.V {
-		t.Error("TestTime failed")
-	}
+	doMarshalUnmarshal(t, &v, &v2)
 }
 
 func TestFlatSliceArray(t *testing.T) {
@@ -483,33 +436,7 @@ func TestFlatSliceArray(t *testing.T) {
 	s1.Au[0] = 11
 	s1.Au[1] = 12
 	s1.Au[4] = 14
-	//fmt.Println("s1:", s1)
-
-	//fmt.Printf("s1: %p, si: %p, s2: %p, si: %p\n", &s1, &s1.Si, &s2, &s2.Si)
-
-	container := parse(s1)
-	//fmt.Println(container)
-	b, _ := container.marshal(&s1)
-	//fmt.Printf("s1: %p, si: %p, s2: %p, si: %p\n", &s1, &s1.Si, &s2, &s2.Si)
-	//fmt.Println("row:", container.Row(0))
-	//fmt.Printf("s2-0: %d %d\n", len(s2.Si), cap(s2.Si))
-	container.unmarshal(b, &s2)
-
-	if !reflect.DeepEqual(s1, s2) {
-		t.Error("TestFlatSliceArray failed")
-	}
-	//fmt.Printf("s1: %p, si: %p, s2: %p, si: %p\n", &s1, &s1.Si, &s2, &s2.Si)
-	//fmt.Println("s2:", s2)
-	//fmt.Printf("s2-1: %d %d\n", len(s2.Si), cap(s2.Si))
-
-	//fmt.Printf("s1.Si[0]: %p, %p\n", &s1.Si, &s1.Si[0])
-
-	//var p *[]byte
-
-	//p := (*[]byte)(unsafe.Pointer(&s1.Si))
-
-	//fmt.Printf("s1.Si[0]: %p, %p\n", p, &(*p)[0])
-
+	doMarshalUnmarshal(t, &s1, &s2)
 }
 
 func TestStringSliceArray(t *testing.T) {
@@ -540,18 +467,8 @@ func TestStringSliceArray(t *testing.T) {
 	s1.Astr[1] = "string array"
 
 	//fmt.Println("s1:", s1)
-	c := parse(s1)
-
-	buf, _ := c.marshal(&s1)
-	//fmt.Println("rows: ", c.Row(0))
-
-	c.unmarshal(buf, &s2)
-
-	if !reflect.DeepEqual(s1, s2) {
-		t.Error("Test string slice array failed")
-	}
+	doMarshalUnmarshal(t, &s1, &s2)
 }
-
 
 func TestStructSliceArray(t *testing.T) {
 
@@ -615,53 +532,30 @@ func TestStructSliceArray(t *testing.T) {
 	doMarshalUnmarshal(t, &v1, &v2, cmpopts.IgnoreUnexported(ost{}), cmpopts.IgnoreUnexported(st{}), cmpopts.IgnoreUnexported(st3{}))
 }
 
-
 func TestParse(t *testing.T) {
 	//var i32 int32 = 0x7fffffff
 	//fmt.Println("TestParse:", string(BOJECT_MAGIC), *(*int32)(Ptr(&BOJECT_MAGIC[0])), i32)
-
 	s := make([]int, 10)
 	s[5] = 5
 	if len(s) != 10 {
 		t.Error("TestMakeSlice len fail")
 	}
 	var s2 []int
-
-	f := parse(s)
-	b, _ := f.marshal(&s)
-
-	f.unmarshal(b, &s2)
-
-	if !reflect.DeepEqual(s, s2) {
-		t.Error("TestDirectSave failed")
-	}
+	doMarshalUnmarshal(t, &s, &s2)
 }
 
 func testBody[T comparable](in T, t *testing.T) {
 	ti := parse(in)
-	dest, _ := ti.marshal(Ptr(&in))
-	fmt.Println("TestTssdInt buf:", dest)
-
+	dest, err := ti.marshal(Ptr(&in))
+	if err != nil {
+		t.Error("testBody marshal err:", err)
+	}
 	//ti.print(dest)
-
 	var out T
-	ti.unmarshal(dest, Ptr(&out))
-	fmt.Println("unmarshal in, out:", in, out)
-	if in != out {
-		t.Error("unmarshal failed")
+	err = ti.unmarshal(dest, Ptr(&out))
+	if err != nil {
+		t.Error("testBody unmarshal err:", err)
 	}
-}
-
-func equalSlice[T comparable](a, b []T) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := 0; i < len(a); i++ {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func testArray[T comparable](in []T, t *testing.T) {
@@ -672,7 +566,7 @@ func testArray[T comparable](in []T, t *testing.T) {
 	var out []T
 	ti.unmarshal(dest, Ptr(&out))
 	fmt.Println("unmarshal in, out:", in, out)
-	if !equalSlice(in, out) {
+	if !SliceEqual(in, out) {
 		t.Error("unmarshal failed")
 	}
 }
@@ -748,7 +642,7 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 		dest, _ := ti.marshal(Ptr(stin))
 		var out st[T]
 		ti.unmarshal(dest, Ptr(&out))
-		if stin.Value != out.Value || !equalSlice(stin.Slice, out.Slice) {
+		if stin.Value != out.Value || !SliceEqual(stin.Slice, out.Slice) {
 			t.Error("unmarshal failed")
 		}
 	}
