@@ -118,7 +118,7 @@ func (ti *typeInfo) mapStructSave(value reflect.Value, buf *Buffer) error {
 	size := buf.Size
 	buf.appendSize4(0).appendSize2(len(ti.info))
 	for i := range len(ti.info) {
-		ti.info[i].mapSave(&ti.info[i], value.Field(i), buf)
+		ti.info[i].mapSave(&ti.info[i], value.Field(ti.info[i].field), buf)
 	}
 	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
 	return nil
@@ -145,7 +145,7 @@ func (ti *typeInfo) mapStructDump(buf *Buffer) (v reflect.Value, err error) {
 			if err != nil {
 				return v, err
 			}
-			v.Field(i).Set(f)
+			v.Field(ti.info[i].field).Set(f)
 		}
 	case -ti.Type:
 		//skip this field
@@ -332,21 +332,3 @@ func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
 	return v, nil
 }
 
-func MakeMap(intf interface{}) reflect.Value {
-	v := reflect.ValueOf(intf)
-	mtyp := v.Type().Elem()
-
-	for v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		v = v.Elem()
-	}
-
-	if v.IsNil() {
-		// Allocate map
-		v.Set(reflect.MakeMap(mtyp))
-	}
-
-	return v
-}

@@ -23,6 +23,7 @@ type typeInfo struct {
 	save          saveFunc
 	dump          dumpFunc
 	size          int
+	field         int       //n-th field
 	offset        Size_t
 	name          string
 	stype         []byte //all the type stream, includeing fields
@@ -448,7 +449,28 @@ func (ti *typeInfo) setType(typ int8) (pos int) {
 	return pos
 }
 
-func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
+func shouldIgnore(intf any, field int) bool {
+	fields := reflect.TypeOf(intf)
+	if !fields.Field(field).IsExported() {
+		return true
+	}
+	value := reflect.ValueOf(intf)
+	if strings.HasPrefix(value.Field(field).Type().String(), TSSD_FLAT_KIND) {
+		return true
+	}
+
+	tag := fields.Field(field).Tag.Get(TSSD_FIELD_TAG_KEY)
+	tags := strings.Split(tag, TSSD_FIELD_TAG_SPLITER)
+	for i:=0; i<len(tags); i++ {
+		if tags[i] == TSSD_FIELD_TAG_IGNORE {
+			return true
+		}
+	}
+	return false
+}
+
+
+func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 
 	field := reflect.TypeOf(intf)
 	value := reflect.ValueOf(intf)
@@ -456,9 +478,6 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 	//ti.typee = value.Kind()
 	ti.rtype = field
 	ti.size = int(field.Size())
-	if strings.HasPrefix(field.String(), TSSD_FLAT_KIND) {
-		return nil
-	}
 
 	ti.root.stype = append(ti.root.stype, typs...) //some typ need add before children
 
@@ -492,9 +511,8 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 		ti.dump = (*typeInfo).objDump
 		ti.mapSave, ti.mapDump = (*typeInfo).mapStructSave, (*typeInfo).mapStructDump
 
-		fields := reflect.TypeOf(intf)
+		fields := field
 		num := fields.NumField()
-
 		ti.setType(Tobject)
 
 		// we append struct's fields to validate, but exclude Flat self
@@ -505,6 +523,10 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 		ti.info = make([]typeInfo, num)
 		var j = 0
 		for i := 0; i < num; i++ {
+			if shouldIgnore(intf, i) {
+				continue
+			}
+
 			ti.info[j].root = ti.root
 			if (&ti.info[j]).doParse(value.Field(i).Interface(), nil) == nil {
 				continue
@@ -512,6 +534,7 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 
 			ti.info[j].offset = fields.Field(i).Offset
 			ti.info[j].name = fields.Field(i).Name
+			ti.info[j].field = i
 			j++
 		}
 		ti.info = ti.info[:j]
@@ -566,7 +589,7 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 	return ti
 }
 
-func parse(intf interface{}) (ti *typeInfo) {
+func parse(intf any) (ti *typeInfo) {
 
 	ti = &typeInfo{stype: make([]byte, 0, 1024)}
 	ti.root = ti

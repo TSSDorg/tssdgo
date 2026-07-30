@@ -4,13 +4,41 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
 	//"strconv"
 	//"assert"
 	//tssd "github.com/simpleKV/tssd/tssd"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
+
+var ignoreTagOpt = cmp.FilterPath(func(p cmp.Path) bool {
+	return strings.HasSuffix(p.GoString(), "Ignore")
+}, cmp.Ignore())
+
+// in & out should be address both
+func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
+
+	//ti := parse(in)
+	value := reflect.ValueOf(in)
+	v := value.Type().Elem()
+	ti := parse(reflect.New(v).Elem().Interface())
+
+	dest, err := ti.marshal(value.UnsafePointer())
+	if err != nil {
+		t.Error("doMarshalUnmarshal marshal fail:", err)
+	}
+	if err = ti.unmarshal(dest, reflect.ValueOf(out).UnsafePointer()); err != nil {
+		t.Error("doMarshalUnmarshal unmarshal fail:", err)
+	}
+
+	if !cmp.Equal(in, out, opts...) {
+		t.Error("cmp equal fail")
+	}
+}
 
 type S1 struct {
 	T   time.Time
@@ -608,76 +636,67 @@ func TestStringSliceArray(t *testing.T) {
 	}
 }
 
-/*
 func TestStructSliceArray(t *testing.T) {
 
-		type st3 struct {
-			I int
-			S []string
-			A [2]string
-		}
-		type st struct {
-			I   int
-			st3 []st3
-			S   string
-		}
-
-		type ost struct {
-			i   int
-			Sst []st
-			Ast [3]st
-			str string
-		}
-
-		var v1, v2 ost
-
-		v1.i = 10
-		v1.str = "struct_slice"
-		//st1 := st{ 12, "str"}
-
-		var s3 st3
-		s3.I = 41
-		s3.S = append(s3.S, "hello s31")
-		s3.A[0] = "hello s3 array 1"
-		s3.A[0] = "hello s3 array 2"
-
-		var st1 st
-		st1.I = 12
-		st1.S = "str"
-
-		st1.st3 = append(st1.st3, s3)
-
-		s3.S = append(s3.S, "hello s32")
-		st1.st3 = append(st1.st3, s3)
-
-		v1.Sst = append(v1.Sst, st1)
-		st1.I = 14
-		st1.S = "test"
-		v1.Sst = append(v1.Sst, st1)
-
-		v1.Ast[0].I = 21
-		v1.Ast[0].S = "inner 1"
-
-		v1.Ast[2].I = 31
-		v1.Ast[2].S = "inner 3"
-
-		v1.Ast[1].I = 31
-		v1.Ast[1].S = "inner 3"
-
-		t.Log("v1:", v1)
-		//fmt.Printf("addr: %p %p\n", &v1.Sst[0], &v1.Sst[1])
-
-		//fmt.Printf("addr a : %p %p %p\n", &v1.Ast[0], &v1.Ast[1], &v1.Ast[2])
-		c := Parse(v1)
-		c.Save(&v1)
-
-		c.DumpRow(0, &v2)
-		t.Log("v2:", v2)
-		if !reflect.DeepEqual(v1, v2) {
-			t.Error("Test struct slice array failed")
-		}
+	type st3 struct {
+		I int
+		S []string
+		A [2]string
 	}
-*/
+	type st struct {
+		I   int
+		st3 []st3
+		S   string
+	}
+
+	type ost struct {
+		i   int
+		Sst []st
+		Ast [3]st
+		str string
+	}
+
+	var v1, v2 ost
+
+	v1.i = 10
+	v1.str = "struct_slice"
+	//st1 := st{ 12, "str"}
+
+	var s3 st3
+	s3.I = 41
+	s3.S = append(s3.S, "hello s31")
+	s3.A[0] = "hello s3 array 1"
+	s3.A[0] = "hello s3 array 2"
+
+	var st1 st
+	st1.I = 12
+	st1.S = "str"
+
+	st1.st3 = append(st1.st3, s3)
+
+	s3.S = append(s3.S, "hello s32")
+	st1.st3 = append(st1.st3, s3)
+
+	v1.Sst = append(v1.Sst, st1)
+	st1.I = 14
+	st1.S = "test"
+	v1.Sst = append(v1.Sst, st1)
+
+	v1.Ast[0].I = 21
+	v1.Ast[0].S = "inner 1"
+
+	v1.Ast[2].I = 31
+	v1.Ast[2].S = "inner 3"
+
+	v1.Ast[1].I = 31
+	v1.Ast[1].S = "inner 3"
+
+	t.Log("v1:", v1)
+	//fmt.Printf("addr: %p %p\n", &v1.Sst[0], &v1.Sst[1])
+
+	//fmt.Printf("addr a : %p %p %p\n", &v1.Ast[0], &v1.Ast[1], &v1.Ast[2])
+	doMarshalUnmarshal(t, &v1, &v2, cmpopts.IgnoreUnexported(ost{}), cmpopts.IgnoreUnexported(st{}), cmpopts.IgnoreUnexported(st3{}))
+}
 
 func TestParse(t *testing.T) {
 	//var i32 int32 = 0x7fffffff
@@ -698,11 +717,6 @@ func TestParse(t *testing.T) {
 	if !reflect.DeepEqual(s, s2) {
 		t.Error("TestDirectSave failed")
 	}
-}
-
-type stx struct {
-	I uint16
-	S string
 }
 
 func testBody[T comparable](in T, t *testing.T) {
@@ -938,18 +952,8 @@ func (this *AllBasicType) rand() {
 
 func TestAllBasicTypeInStruct(t *testing.T) {
 	var in, out AllBasicType
-	ti := parse(in)
-
 	(&in).rand()
-
-	dest, _ := ti.marshal(Ptr(&in))
-	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
-
-	ti.unmarshal(dest, Ptr(&out))
-	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
-	if !reflect.DeepEqual(in, out) {
-		t.Error("testAllBasicTypeInStruct unmarshal failed")
-	}
+	doMarshalUnmarshal(t, &in, &out)
 }
 
 func TestAllBasicTypeInStructArray(t *testing.T) {
@@ -968,6 +972,7 @@ func TestAllBasicTypeInStructArray(t *testing.T) {
 	if !reflect.DeepEqual(in, out) {
 		t.Error("testAllBasicTypeInStruct unmarshal failed")
 	}
+	doMarshalUnmarshal(t, &in, &out)
 }
 
 func TestAllBasicTypeInStructSlice(t *testing.T) {
@@ -998,38 +1003,16 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 
 func TestTssdArray(t *testing.T) {
 	var array = [4]int16{1, 2, 3, 4}
-	ti := parse(array)
-
-	dest, _ := ti.marshal(Ptr(&array))
-
-	fmt.Println("TestTssdArray2 buf:", dest)
-
 	var j [4]int16
-	err := ti.unmarshal(dest, Ptr(&j))
-
-	fmt.Println("unmarshal array j:", array, j, err, cap(j))
-
-	if err != nil || !reflect.DeepEqual(array, j) {
-		t.Error("unmarsha array failed")
-	}
+	doMarshalUnmarshal(t, &array, &j)
 }
 
 func TestTssdSlice(t *testing.T) {
 	var array = []int64{
 		1, 2, 3, 4,
 	}
-	ti := parse(array)
-
-	dest, _ := ti.marshal(Ptr(&array))
-	fmt.Println("TestTssdSlice:", dest)
-	ti.print(*dest)
-
 	var j []int64
-	err := ti.unmarshal(dest, Ptr(&j))
-	fmt.Println("unmarshal slice j:", array, j, err, dest)
-	if err != nil || !reflect.DeepEqual(array, j) {
-		t.Error("unmarsha slice failed")
-	}
+	doMarshalUnmarshal(t, &array, &j)
 }
 
 func TestTssdStringSlice(t *testing.T) {
@@ -1054,20 +1037,15 @@ func TestTssdMap(t *testing.T) {
 		"12": 0x1234,
 		"34": 0x5678,
 	}
-	ti := parse(mp)
-
-	dest, _ := ti.marshal(Ptr(&mp))
-
-	fmt.Println("TestTssdMap buf2:", dest)
-	ti.print(*dest)
-
 	var j map[string]int32
+	doMarshalUnmarshal(t, &mp, &j)
+}
 
-	err := ti.unmarshal(dest, Ptr(&j))
-	fmt.Println("unmarshal map j:", mp, j, err)
-	if err != nil || !reflect.DeepEqual(mp, j) {
-		t.Error("unmarsha map failed")
-	}
+type stx struct {
+	I       uint16
+	BIgnore string `tssd:"-,"` // tags ignore
+	S       string
+	a       int32 // unexported
 }
 
 func TestTssdMapStructSlice(t *testing.T) {
@@ -1076,13 +1054,13 @@ func TestTssdMapStructSlice(t *testing.T) {
 	ti := parse(mp)
 
 	mp = append(mp, map[string]stx{
-		"12":  {345, "hello"},
-		"foo": {6789, "bar"},
+		"12":  {345, "2", "hello", 1},
+		"foo": {6789, "3", "bar", 2},
 	})
 
 	mp = append(mp, map[string]stx{
-		"1278":    {45, "helllllo"},
-		"foooooo": {789, "barrr"},
+		"1278":    {45, "4", "helllllo", 3},
+		"foooooo": {789, "5", "barrr", 4},
 	})
 
 	dest, _ := ti.marshal(Ptr(&mp))
@@ -1093,8 +1071,13 @@ func TestTssdMapStructSlice(t *testing.T) {
 
 	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
-	if err != nil || !reflect.DeepEqual(mp, j) {
-		t.Error("unmarsha TestTssdMapStruct failed")
+
+	fmt.Println("mp:", mp)
+	fmt.Println("j:", j)
+	fmt.Println("diff: ", cmp.Diff(mp, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt))
+
+	if err != nil || !cmp.Equal(mp, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt) {
+		t.Error("cmp equal fail")
 	}
 }
 
@@ -1103,45 +1086,20 @@ func TestTssdMapSliceValue(t *testing.T) {
 		"12":  {"345", "hello"},
 		"foo": {"6789", "bar"},
 	}
-
-	ti := parse(mp)
-
-	dest, _ := ti.marshal(Ptr(&mp))
-
-	fmt.Println("TestTssdMapStruct buf2:", dest)
-
 	var j map[string][]string
 
-	err := ti.unmarshal(dest, Ptr(&j))
-	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
-	if err != nil || !reflect.DeepEqual(mp, j) {
-		t.Error("unmarsha TestTssdMapStruct failed")
-	}
+	doMarshalUnmarshal(t, &mp, &j)
 }
 
 func TestTssdPrint(t *testing.T) {
-
 	s := stx{
 		1234,
+		"ssss",
 		"hello",
+		5,
 	}
-	ti := parse(stx{})
-
-	dest, _ := ti.marshal(Ptr(&s))
-
-	fmt.Println("===============TestTssdPrint===========================")
-	ti.print(*dest)
-
 	var j stx
-	err := ti.unmarshal(dest, Ptr(&j))
-	if err != nil || j != s {
-		t.Error("unmarshal struct failed:", s, j, err)
-	}
-	//fmt.Println("unmarshal struct s, j:", s, j)
-
-	if !reflect.DeepEqual(s, j) {
-		t.Error("unmarsha struct failed")
-	}
+	doMarshalUnmarshal(t, &s, &j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt)
 }
 
 func TestTssdTypes(t *testing.T) {
@@ -1186,4 +1144,120 @@ func TestTssdTypes(t *testing.T) {
 		t.Error("parse st4 types error")
 	}
 
+}
+
+type stIgnoreTestIn struct {
+	Value   int16
+	a       string //unexp
+	BIgnore int32  `tssd:"xxx,-,yyy"`
+	B       byte
+}
+
+type stIgnoreTest struct {
+	AIgnore stIgnoreTestIn `tssd:"other,-,123"`
+	S       stIgnoreTestIn
+	unexp   int8
+	Str     string
+}
+
+func TestUnexportedAndIgnoreFields(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+	var s2 stIgnoreTestIn
+
+	doMarshalUnmarshal(t, &s1, &s2, cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsNest(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+
+	var s4 stIgnoreTest
+	doMarshalUnmarshal(t, &s3, &s4, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsSlice(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+	s4 := stIgnoreTest{
+		s1,
+		s2,
+		88,
+		"Hello world",
+	}
+	in := []stIgnoreTest{s3, s4}
+	var out []stIgnoreTest
+	doMarshalUnmarshal(t, &in, &out, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestUnexportedAndIgnoreFieldsMap(t *testing.T) {
+	s1 := stIgnoreTestIn{
+		123,
+		"astring",
+		456,
+		32,
+	}
+
+	s2 := stIgnoreTestIn{
+		1234,
+		"xxxastring",
+		456789,
+		23,
+	}
+	s3 := stIgnoreTest{
+		s1,
+		s2,
+		7,
+		"Hello TSSD",
+	}
+	s4 := stIgnoreTest{
+		s1,
+		s2,
+		88,
+		"Hello world",
+	}
+	in := map[string]stIgnoreTest{
+		"hello": s3,
+		"foo":   s4,
+	}
+	var out map[string]stIgnoreTest
+	doMarshalUnmarshal(t, &in, &out, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
 }
