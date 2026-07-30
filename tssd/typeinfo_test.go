@@ -40,6 +40,7 @@ func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
 	}
 }
 
+
 type S1 struct {
 	T   time.Time
 	V   int16
@@ -106,21 +107,11 @@ func TestSimpleStringSlice(t *testing.T) {
 	type slice struct {
 		Ss []string
 	}
-
 	sin := slice{
 		[]string{"a", "b"},
 	}
 	var sout slice
-	container := parse(sin)
-	buf, _ := container.marshal(&sin)
-	container.print(*buf)
-	fmt.Println("TestSimpleStringSlice buf:", buf)
-
-	container.unmarshal(buf, &sout)
-	if !reflect.DeepEqual(sin, sout) {
-		fmt.Println("TestSimpleStringSlice sout:", sout)
-		t.Errorf("Test String slice err ")
-	}
+	doMarshalUnmarshal(t, &sin, &sout)
 }
 
 func TestStringSlice(t *testing.T) {
@@ -136,17 +127,11 @@ func TestStringSlice(t *testing.T) {
 		21,
 	}
 	var s2 ss
-	container := parse(sin1)
-	buf, _ := container.marshal(&sin1)
+	doMarshalUnmarshal(t, &sin1, &s2)
 
-	container.unmarshal(buf, &s2)
-	if !reflect.DeepEqual(sin1, s2) {
-		t.Errorf("Test String slice err ")
-	}
 }
 
 func TestStringArray(t *testing.T) {
-
 	type ss struct {
 		I    int
 		Strs [4]string
@@ -158,16 +143,7 @@ func TestStringArray(t *testing.T) {
 		21,
 	}
 	var s2 ss
-	container := parse(sin1)
-	n, _ := container.marshal(&sin1)
-
-	fmt.Println(container)
-	fmt.Println(sin1, n)
-
-	container.unmarshal(n, &s2)
-	if !reflect.DeepEqual(sin1, s2) {
-		t.Errorf("Test String array err")
-	}
+	doMarshalUnmarshal(t, &sin1, &s2)
 }
 
 func TestSliceXXX(t *testing.T) {
@@ -185,43 +161,13 @@ func TestSliceXXX(t *testing.T) {
 		[]byte("hello world"),
 	}
 	var s2 ss
-
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println("=========================TestSlice================================", n)
-	fmt.Printf("%p, %p\n", &s2, &s2.I)
-	fmt.Println(s2)
-	//p := (*[]byte)(Ptr(&s2))
-	//*p = make([]byte, 16)
-	//*p = (*p)[0:2] //set size
-
-	fmt.Println("after alloc:", s2)
-
-	container.unmarshal(n, &s2)
-	//fmt.Printf("after unmarshal %p, %p %p %p %p\n", &s2, &s2.I, &s2.I[0], &s2.I64, &s2.I64[0])
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(in1, s2)
-		t.Errorf("Test String slice err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestSliceUint(t *testing.T) {
-
 	in1 := []int8{1, 2, 3, 5, 4}
-
 	var s2 []int8
-
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println(s2)
-
-	container.unmarshal(n, &s2)
-	fmt.Println("after alloc:", s2)
-	//fmt.Printf("after unmarshal %p, %p %p\n", &s2, &s2.I, &s2.I[0])
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(in1, s2)
-		t.Errorf("Test String slice err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestSlice(t *testing.T) {
@@ -240,15 +186,7 @@ func TestSlice(t *testing.T) {
 	}
 	var s2 ss
 
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println("=========================TestSlice================================", n)
-
-	container.unmarshal(n, &s2)
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(in1, s2)
-		t.Errorf("Test String slice err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 
 	in1 = ss{
 		[]int{},
@@ -256,13 +194,7 @@ func TestSlice(t *testing.T) {
 		[]int64{},
 		[]byte{},
 	}
-	n, _ = container.marshal(&in1)
-
-	container.unmarshal(n, &s2)
-	fmt.Println("Test slice:", len(s2.I), len(s2.Strs), len(s2.I64), len(s2.B))
-	if len(s2.I) > 0 || len(s2.Strs) > 0 || len(s2.I64) > 0 || len(s2.B) > 0 {
-		t.Errorf("Test slice err:")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestArray(t *testing.T) {
@@ -280,15 +212,7 @@ func TestArray(t *testing.T) {
 		[5]byte{'h', 'e', 'l', 'l', '0'},
 	}
 	var s2 ss
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println(in1)
-
-	container.unmarshal(n, &s2)
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(s2)
-		t.Errorf("Test array err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestNestStruct(t *testing.T) {
@@ -310,15 +234,7 @@ func TestNestStruct(t *testing.T) {
 		[]string{"abc", "", "abcd", "a"},
 	}
 	var s2 ss
-	container := parse(in1)
-	n, _ := container.marshal(&in1)
-	fmt.Println(in1)
-
-	container.unmarshal(n, &s2)
-	if !reflect.DeepEqual(in1, s2) {
-		fmt.Println(s2)
-		t.Errorf("Test TestNestStruct err ")
-	}
+	doMarshalUnmarshal(t, &in1, &s2)
 }
 
 func TestNestStructSlice(t *testing.T) {
@@ -636,6 +552,7 @@ func TestStringSliceArray(t *testing.T) {
 	}
 }
 
+
 func TestStructSliceArray(t *testing.T) {
 
 	type st3 struct {
@@ -697,6 +614,7 @@ func TestStructSliceArray(t *testing.T) {
 	//fmt.Printf("addr a : %p %p %p\n", &v1.Ast[0], &v1.Ast[1], &v1.Ast[2])
 	doMarshalUnmarshal(t, &v1, &v2, cmpopts.IgnoreUnexported(ost{}), cmpopts.IgnoreUnexported(st{}), cmpopts.IgnoreUnexported(st3{}))
 }
+
 
 func TestParse(t *testing.T) {
 	//var i32 int32 = 0x7fffffff
