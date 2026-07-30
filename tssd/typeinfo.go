@@ -448,6 +448,19 @@ func (ti *typeInfo) setType(typ int8) (pos int) {
 	return pos
 }
 
+func shouldIgnore(intf any, field int) bool {
+	fields := reflect.TypeOf(intf)
+	if !fields.Field(field).IsExported() {
+		return true
+	}
+	value := reflect.ValueOf(intf)
+	if strings.HasPrefix(value.Field(field).Type().String(), TSSD_FLAT_KIND) {
+		return true
+	}
+	return false
+}
+
+
 func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 
 	field := reflect.TypeOf(intf)
@@ -456,10 +469,6 @@ func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 	//ti.typee = value.Kind()
 	ti.rtype = field
 	ti.size = int(field.Size())
-	if strings.HasPrefix(field.String(), TSSD_FLAT_KIND) {
-		return nil
-	}
-
 
 	ti.root.stype = append(ti.root.stype, typs...) //some typ need add before children
 
@@ -493,9 +502,8 @@ func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 		ti.dump = (*typeInfo).objDump
 		ti.mapSave, ti.mapDump = (*typeInfo).mapStructSave, (*typeInfo).mapStructDump
 
-		fields := reflect.TypeOf(intf)
+		fields := field
 		num := fields.NumField()
-
 		ti.setType(Tobject)
 
 		// we append struct's fields to validate, but exclude Flat self
@@ -506,9 +514,10 @@ func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 		ti.info = make([]typeInfo, num)
 		var j = 0
 		for i := 0; i < num; i++ {
-			if !fields.Field(i).IsExported() {
+			if shouldIgnore(intf, i) {
 				continue
 			}
+
 			ti.info[j].root = ti.root
 			if (&ti.info[j]).doParse(value.Field(i).Interface(), nil) == nil {
 				continue
