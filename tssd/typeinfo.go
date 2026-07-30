@@ -23,6 +23,7 @@ type typeInfo struct {
 	save          saveFunc
 	dump          dumpFunc
 	size          int
+	field         int       //n-th field
 	offset        Size_t
 	name          string
 	stype         []byte //all the type stream, includeing fields
@@ -457,6 +458,14 @@ func shouldIgnore(intf any, field int) bool {
 	if strings.HasPrefix(value.Field(field).Type().String(), TSSD_FLAT_KIND) {
 		return true
 	}
+
+	tag := fields.Field(field).Tag.Get(TSSD_FIELD_TAG_KEY)
+	tags := strings.Split(tag, TSSD_FIELD_TAG_SPLITER)
+	for i:=0; i<len(tags); i++ {
+		if tags[i] == TSSD_FIELD_TAG_IGNORE {
+			return true
+		}
+	}
 	return false
 }
 
@@ -525,6 +534,7 @@ func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 
 			ti.info[j].offset = fields.Field(i).Offset
 			ti.info[j].name = fields.Field(i).Name
+			ti.info[j].field = i
 			j++
 		}
 		ti.info = ti.info[:j]

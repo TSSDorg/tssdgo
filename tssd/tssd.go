@@ -16,6 +16,9 @@ const (
 	TSSD_VERSION_MAJOR            = 0
 	TSSD_FLAT_KIND                = "tssd.Flat"
 	TSSD_TIME_KIND                = "time.Time"
+	TSSD_FIELD_TAG_KEY            = "tssd"
+	TSSD_FIELD_TAG_IGNORE         = "-"
+	TSSD_FIELD_TAG_SPLITER        = ","
 	TSSD_TYPE_LENGTH              = 1
 	TSSD_SIZET_LENGTH             = 4
 	TSSD_SIZEA_LENGTH             = 2

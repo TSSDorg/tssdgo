@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
+	"strings"
 	"time"
 	"unsafe"
 	//"strconv"
@@ -1071,8 +1072,9 @@ func TestTssdMap(t *testing.T) {
 
 type stx struct {
 	I uint16
+	BIgnore string   `tssd:"-,"`  // tags ignore
 	S string
-	v int32
+	a int32  // unexported
 }
 
 func TestTssdMapStructSlice(t *testing.T) {
@@ -1081,13 +1083,13 @@ func TestTssdMapStructSlice(t *testing.T) {
 	ti := parse(mp)
 
 	mp = append(mp, map[string]stx{
-		"12":  {345, "hello", 1},
-		"foo": {6789, "bar", 2},
+		"12":  {345, "2", "hello", 1},
+		"foo": {6789, "3", "bar", 2},
 	})
 
 	mp = append(mp, map[string]stx{
-		"1278":    {45, "helllllo", 3},
-		"foooooo": {789, "barrr", 4},
+		"1278":    {45, "4", "helllllo", 3},
+		"foooooo": {789, "5", "barrr", 4},
 	})
 
 	dest, _ := ti.marshal(Ptr(&mp))
@@ -1099,7 +1101,17 @@ func TestTssdMapStructSlice(t *testing.T) {
 	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
 
-	if err != nil || !cmp.Equal(mp, j, cmpopts.IgnoreUnexported(stx{})) {
+	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
+				ign := strings.HasSuffix(p.GoString(), "Ignore")
+				fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
+				return ign
+			}, cmp.Ignore())
+
+	fmt.Println("mp:", mp)
+	fmt.Println("j:", j)
+	fmt.Println("diff: ", cmp.Diff(mp, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt))
+
+	if err != nil || !cmp.Equal(mp, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt) {
 		t.Error("cmp equal fail")
 	}
 }
@@ -1129,6 +1141,7 @@ func TestTssdPrint(t *testing.T) {
 
 	s := stx{
 		1234,
+		"ssss",
 		"hello",
 		5,
 	}
@@ -1195,3 +1208,49 @@ func TestTssdTypes(t *testing.T) {
 
 }
 
+func TestUnexported(t *testing.T) {
+
+	type st1 struct {
+		Value int16
+		a     string
+		BIgnore    int32
+	}
+/*
+	type st struct {
+		st1
+		value int8
+	}
+*/
+	//parse(st{})
+
+	s1 := st1 {
+		1,
+		"abc",
+		2,
+	}
+
+	s2 := st1 {
+		1,
+		"d",
+		5,
+	}
+
+	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
+                if len(p) == 0 {
+                        return false
+                }
+                t := p[len(p)-1].Type()
+
+				ign := strings.HasSuffix(p.GoString(), "Ignore")
+				fmt.Println("=============ignoreTagOpt: ", t.String(), t.Name(), p.GoString(), ign)
+				return ign
+			}, cmp.Ignore())
+
+	fmt.Println("s1:", s1)
+	fmt.Println("s2:", s2)
+
+	if !cmp.Equal(s1, s2, cmpopts.IgnoreUnexported(st1{}), ignoreTagOpt) {
+		t.Error("cmp equal fail")
+	}
+
+}
