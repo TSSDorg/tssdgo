@@ -448,7 +448,7 @@ func (ti *typeInfo) setType(typ int8) (pos int) {
 	return pos
 }
 
-func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
+func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 
 	field := reflect.TypeOf(intf)
 	value := reflect.ValueOf(intf)
@@ -459,6 +459,7 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 	if strings.HasPrefix(field.String(), TSSD_FLAT_KIND) {
 		return nil
 	}
+
 
 	ti.root.stype = append(ti.root.stype, typs...) //some typ need add before children
 
@@ -505,6 +506,9 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 		ti.info = make([]typeInfo, num)
 		var j = 0
 		for i := 0; i < num; i++ {
+			if !fields.Field(i).IsExported() {
+				continue
+			}
 			ti.info[j].root = ti.root
 			if (&ti.info[j]).doParse(value.Field(i).Interface(), nil) == nil {
 				continue
@@ -566,7 +570,7 @@ func (ti *typeInfo) doParse(intf interface{}, typs []byte) *typeInfo {
 	return ti
 }
 
-func parse(intf interface{}) (ti *typeInfo) {
+func parse(intf any) (ti *typeInfo) {
 
 	ti = &typeInfo{stype: make([]byte, 0, 1024)}
 	ti.root = ti

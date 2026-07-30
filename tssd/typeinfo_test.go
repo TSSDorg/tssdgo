@@ -10,6 +10,8 @@ import (
 	//"strconv"
 	//"assert"
 	//tssd "github.com/simpleKV/tssd/tssd"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 type S1 struct {
@@ -700,10 +702,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-type stx struct {
-	I uint16
-	S string
-}
+
 
 func testBody[T comparable](in T, t *testing.T) {
 	ti := parse(in)
@@ -1070,19 +1069,25 @@ func TestTssdMap(t *testing.T) {
 	}
 }
 
+type stx struct {
+	I uint16
+	S string
+	v int32
+}
+
 func TestTssdMapStructSlice(t *testing.T) {
 	var mp []map[string]stx
 
 	ti := parse(mp)
 
 	mp = append(mp, map[string]stx{
-		"12":  {345, "hello"},
-		"foo": {6789, "bar"},
+		"12":  {345, "hello", 1},
+		"foo": {6789, "bar", 2},
 	})
 
 	mp = append(mp, map[string]stx{
-		"1278":    {45, "helllllo"},
-		"foooooo": {789, "barrr"},
+		"1278":    {45, "helllllo", 3},
+		"foooooo": {789, "barrr", 4},
 	})
 
 	dest, _ := ti.marshal(Ptr(&mp))
@@ -1093,8 +1098,9 @@ func TestTssdMapStructSlice(t *testing.T) {
 
 	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
-	if err != nil || !reflect.DeepEqual(mp, j) {
-		t.Error("unmarsha TestTssdMapStruct failed")
+
+	if err != nil || !cmp.Equal(mp, j, cmpopts.IgnoreUnexported(stx{})) {
+		t.Error("cmp equal fail")
 	}
 }
 
@@ -1124,6 +1130,7 @@ func TestTssdPrint(t *testing.T) {
 	s := stx{
 		1234,
 		"hello",
+		5,
 	}
 	ti := parse(stx{})
 
@@ -1134,13 +1141,13 @@ func TestTssdPrint(t *testing.T) {
 
 	var j stx
 	err := ti.unmarshal(dest, Ptr(&j))
-	if err != nil || j != s {
+	if err != nil {
 		t.Error("unmarshal struct failed:", s, j, err)
 	}
 	//fmt.Println("unmarshal struct s, j:", s, j)
 
-	if !reflect.DeepEqual(s, j) {
-		t.Error("unmarsha struct failed")
+	if err != nil || !cmp.Equal(s, j, cmpopts.IgnoreUnexported(stx{})) {
+		t.Error("cmp equal fail")
 	}
 }
 
@@ -1187,3 +1194,4 @@ func TestTssdTypes(t *testing.T) {
 	}
 
 }
+

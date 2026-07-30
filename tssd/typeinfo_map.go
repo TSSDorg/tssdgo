@@ -332,21 +332,3 @@ func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
 	return v, nil
 }
 
-func MakeMap(intf interface{}) reflect.Value {
-	v := reflect.ValueOf(intf)
-	mtyp := v.Type().Elem()
-
-	for v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		v = v.Elem()
-	}
-
-	if v.IsNil() {
-		// Allocate map
-		v.Set(reflect.MakeMap(mtyp))
-	}
-
-	return v
-}
