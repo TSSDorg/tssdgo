@@ -15,6 +15,32 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
+var ignoreTagOpt = cmp.FilterPath(func(p cmp.Path) bool {
+	return strings.HasSuffix(p.GoString(), "Ignore")
+}, cmp.Ignore())
+
+// in & out should be address both
+func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
+
+	//ti := parse(in)
+	value := reflect.ValueOf(in)
+	v := value.Type().Elem()
+	ti := parse(reflect.New(v).Elem().Interface())
+
+	dest, err := ti.marshal(value.UnsafePointer())
+	if err != nil {
+		t.Error("doMarshalUnmarshal marshal fail:", err)
+	}
+	if err = ti.unmarshal(dest, reflect.ValueOf(out).UnsafePointer()); err != nil {
+		t.Error("doMarshalUnmarshal unmarshal fail:", err)
+	}
+
+	if !cmp.Equal(in, out, opts...) {
+		t.Error("cmp equal fail")
+	}
+}
+
+
 type S1 struct {
 	T   time.Time
 	V   int16
@@ -1099,12 +1125,6 @@ func TestTssdMapStructSlice(t *testing.T) {
 	err := ti.unmarshal(dest, Ptr(&j))
 	fmt.Println("unmarshal TestTssdMapStruct j:", mp, j, err)
 
-	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
-		ign := strings.HasSuffix(p.GoString(), "Ignore")
-		fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
-		return ign
-	}, cmp.Ignore())
-
 	fmt.Println("mp:", mp)
 	fmt.Println("j:", j)
 	fmt.Println("diff: ", cmp.Diff(mp, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt))
@@ -1155,12 +1175,6 @@ func TestTssdPrint(t *testing.T) {
 	if err != nil {
 		t.Error("unmarshal struct failed:", s, j, err)
 	}
-	//fmt.Println("unmarshal struct s, j:", s, j)
-	ignoreTagOpt := cmp.FilterPath(func(p cmp.Path) bool {
-		ign := strings.HasSuffix(p.GoString(), "Ignore")
-		fmt.Println("=============ignoreTagOpt: ", t.Name(), p.String(), ign)
-		return ign
-	}, cmp.Ignore())
 
 	if err != nil || !cmp.Equal(s, j, cmpopts.IgnoreUnexported(stx{}), ignoreTagOpt) {
 		t.Error("cmp equal fail")
@@ -1209,31 +1223,6 @@ func TestTssdTypes(t *testing.T) {
 		t.Error("parse st4 types error")
 	}
 
-}
-
-var ignoreTagOpt = cmp.FilterPath(func(p cmp.Path) bool {
-	ign := strings.HasSuffix(p.GoString(), "Ignore")
-	return ign
-}, cmp.Ignore())
-
-func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
-
-	//ti := parse(in)
-	value := reflect.ValueOf(in)
-	v := value.Type().Elem()
-	ti := parse(reflect.New(v).Elem().Interface())
-
-	dest, err := ti.marshal(value.UnsafePointer())
-	if err != nil {
-		t.Error("doMarshalUnmarshal marshal fail:", err)
-	}
-	if err = ti.unmarshal(dest, reflect.ValueOf(out).UnsafePointer()); err != nil {
-		t.Error("doMarshalUnmarshal unmarshal fail:", err)
-	}
-
-	if !cmp.Equal(in, out, opts...) {
-		t.Error("cmp equal fail")
-	}
 }
 
 type stIgnoreTestIn struct {
