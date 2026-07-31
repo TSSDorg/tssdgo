@@ -635,6 +635,11 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 	type st[T comparable] struct {
 		Value T
 		Slice []T
+		Pt    *T
+		M     map[T]T
+		Mp    map[T]*T
+		Mp2   map[T][]T
+		Mp3   map[T]*[]T
 	}
 
 	ti := parse(st[T]{})
@@ -642,14 +647,20 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 		dest, _ := ti.marshal(Ptr(stin))
 		var out st[T]
 		ti.unmarshal(dest, Ptr(&out))
-		if stin.Value != out.Value || !SliceEqual(stin.Slice, out.Slice) {
+		if stin.Value != out.Value || *stin.Pt != *out.Pt || !SliceEqual(stin.Slice, out.Slice) {
 			t.Error("unmarshal failed")
 		}
 	}
 	for i := range in {
-		fn(&st[T]{Value: in[i]})
+		fn(&st[T]{
+			Value: in[i],
+			Pt:    &in[i],
+			Slice: in,
+			M:     map[T]T{in[i]: in[i]},
+			Mp:    map[T]*T{in[i]: new(in[i])},
+			Mp2:   map[T][]T{in[i]: in},
+			Mp3:   map[T]*[]T{in[i]: &in}})
 	}
-	fn(&st[T]{Slice: in})
 }
 
 func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
