@@ -42,8 +42,6 @@ var simpleSave = map[reflect.Kind]srcAddr{
 	},
 }
 
-type destAddr = func() Ptr
-
 func intDestAddr() Ptr {
 	s := new(int)
 	return Ptr(s)
@@ -54,30 +52,6 @@ func uintDestAddr() Ptr {
 	return Ptr(s)
 }
 
-var simpleDump map[reflect.Kind]destAddr = map[reflect.Kind]destAddr{
-	reflect.Bool: func() Ptr {
-		s := new(bool)
-		return Ptr(s)
-	},
-	reflect.Int:    intDestAddr,
-	reflect.Uint:   uintDestAddr,
-	reflect.Int8:   intDestAddr,
-	reflect.Uint8:  uintDestAddr,
-	reflect.Int16:  intDestAddr,
-	reflect.Uint16: uintDestAddr,
-	reflect.Int32:  intDestAddr,
-	reflect.Uint32: uintDestAddr,
-	reflect.Int64:  intDestAddr,
-	reflect.Uint64: uintDestAddr,
-	reflect.Float32: func() Ptr {
-		s := new(float32)
-		return Ptr(s)
-	},
-	reflect.Float64: func() Ptr {
-		s := new(float64)
-		return Ptr(s)
-	},
-}
 
 func (ti *typeInfo) mapSimpleSave(value reflect.Value, buf *Buffer) error {
 	s := simpleSave[ti.rtype.Kind()](value)
@@ -85,9 +59,9 @@ func (ti *typeInfo) mapSimpleSave(value reflect.Value, buf *Buffer) error {
 }
 
 func (ti *typeInfo) mapSimpleDump(buf *Buffer) (reflect.Value, error) {
-	d := simpleDump[ti.rtype.Kind()]()
-	err := ti.dump(ti, buf, d)
-	return reflect.NewAt(ti.rtype, d).Elem(), err
+	d := reflect.New(ti.rtype)
+	err := ti.dump(ti, buf, d.UnsafePointer())
+	return d.Elem(), err
 }
 
 func (ti *typeInfo) mapStrSave(value reflect.Value, buf *Buffer) error {
@@ -107,8 +81,13 @@ func (ti *typeInfo) mapPointerSave(value reflect.Value, buf *Buffer) error {
 }
 
 func (ti *typeInfo) mapPointerDump(buf *Buffer) (reflect.Value, error) {
-	v, err := ti.info[0].mapDump(&ti.info[0], buf)
-	return v.Addr(), err
+	//v, err := ti.info[0].mapDump(&ti.info[0], buf)
+	//return v.Addr(), err
+	d := reflect.New(ti.rtype)
+	d0 := reflect.NewAt(ti.info[0].rtype, d.UnsafePointer())
+	//var s *byte = nil
+	err := ti.info[0].dump(&ti.info[0], buf, d0.UnsafePointer())
+	return d.Elem(), err
 }
 
 func (ti *typeInfo) mapTimeSave(value reflect.Value, buf *Buffer) error {
@@ -248,9 +227,9 @@ func (ti *typeInfo) mapMergeSliceValueDump(buf *Buffer) (v reflect.Value, err er
 		}
 
 		for i := 0; i < arrayN; i++ {
-			obj := simpleDump[ti.info[0].rtype.Kind()]()
-			buf.Read(Slice(Ptr(obj), Size_t(ti.info[0].size)))
-			v.Index(i).Set(reflect.NewAt(ti.info[0].rtype, obj).Elem())
+			obj := reflect.New(ti.info[0].rtype)
+			buf.Read(Slice(obj.UnsafePointer(), Size_t(ti.info[0].size)))
+			v.Index(i).Set(obj.Elem())
 		}
 	case -ti.Type:
 		//skip this field
