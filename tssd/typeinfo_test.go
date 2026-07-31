@@ -792,7 +792,7 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 	ti := parse(in)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	n := r.Intn(128)
+	n := r.Intn(256)
 
 	in = make([]AllBasicType, n)
 
@@ -807,6 +807,11 @@ func TestAllBasicTypeInStructSlice(t *testing.T) {
 	//fmt.Println("testAllBasicTypeInStruct buf:", dest)
 
 	ti.unmarshal(buf, Ptr(&out))
+
+	if !cmp.Equal(in, out) {
+		t.Error("TestAllBasicTypeInStructSlice unmarshal cmp failed")
+	}
+
 	//fmt.Println("testAllBasicTypeInStruct unmarshal in, out:", in, out)
 	if !reflect.DeepEqual(in, out) {
 		t.Error("TestAllBasicTypeInStructSlice unmarshal failed")
@@ -1072,4 +1077,140 @@ func TestUnexportedAndIgnoreFieldsMap(t *testing.T) {
 	}
 	var out map[string]stIgnoreTest
 	doMarshalUnmarshal(t, &in, &out, cmpopts.IgnoreUnexported(stIgnoreTest{}), cmpopts.IgnoreUnexported(stIgnoreTestIn{}), ignoreTagOpt)
+}
+
+func TestPointer(t *testing.T) {
+	type st struct {
+		Str *string
+		I   *int32
+	}
+	s1 := st{
+		new("hello pointer"),
+		new(int32(123)),
+	}
+	var s2 st
+	doMarshalUnmarshal(t, &s1, &s2)
+}
+
+func TestPointerSlice(t *testing.T) {
+	type st struct {
+		Str []*string
+		I   []*int32
+	}
+	s1 := st{
+		[]*string{new("hello pointer"), new("foo")},
+		[]*int32{new(int32(123)), new(int32(1234))},
+	}
+	var s2 st
+	doMarshalUnmarshal(t, &s1, &s2)
+
+	//test slice slice
+
+	var s3 = []st{
+		s1, s1,
+	}
+	var s4 []st
+
+	doMarshalUnmarshal(t, &s3, &s4)
+}
+
+func TestPointerInMapSimple(t *testing.T) {
+
+	s := int32(123)
+
+	s3 := map[string]*int32{
+		"hello": &s,
+	}
+	var s2 map[string]*int32
+	doMarshalUnmarshal(t, &s3, &s2)
+}
+
+func TestPointerInMapString(t *testing.T) {
+
+	s1 := map[int]*string{
+		123: new("hello"),
+	}
+	var s2 map[int]*string
+	doMarshalUnmarshal(t, &s1, &s2)
+}
+
+func TestPointerInMapStruct(t *testing.T) {
+	type st struct {
+		Str *string
+		I   *int
+	}
+	s1 := map[int32]*st{
+		int32(123): &st{new("hello"), new(456)},
+	}
+	var s2 map[int32]*st
+	doMarshalUnmarshal(t, &s1, &s2)
+}
+
+func TestPointerInMap(t *testing.T) {
+	type st struct {
+		Str string
+		I   int32
+	}
+	s1 := st{
+		"hello",
+		int32(11222),
+	}
+
+	s3 := map[string]*st{
+		"hello": &s1,
+		"foo":   &s1,
+	}
+	var s2 map[string]*st
+	doMarshalUnmarshal(t, &s3, &s2)
+}
+
+func TestPointerInMapSlice(t *testing.T) {
+	type st struct {
+		Str []*string
+		I   []*int32
+	}
+	s1 := st{
+		[]*string{new("hello pointer"), new("foo")},
+		[]*int32{new(int32(123)), new(int32(1234))},
+	}
+
+	s2 := st{
+		[]*string{new("hello pointerxx"), new("fooyy")},
+		[]*int32{new(int32(1234)), new(int32(12345))},
+	}
+
+	s3 := map[string]*st{
+		"hello": &s1,
+		"foo":   &s2,
+	}
+	s4 := map[string]*st{
+		"bar": &s1,
+	}
+	doMarshalUnmarshal(t, &s3, &s4)
+}
+
+func TestPointerInMapToMap(t *testing.T) {
+	type st struct {
+		Str []*string
+		I   []*int32
+	}
+	s1 := st{
+		[]*string{new("hello pointer"), new("foo")},
+		[]*int32{new(int32(123)), new(int32(1234))},
+	}
+
+	s2 := st{
+		[]*string{new("hello pointerxx"), new("fooyy")},
+		[]*int32{new(int32(1234)), new(int32(12345))},
+	}
+	s3 := map[string]*st{
+		"hello": &s1,
+		"foo":   &s2,
+	}
+	s4 := map[string]*map[string]*st{
+		"abc": &s3,
+		"edf": &s3,
+	}
+	var s5 map[string]*map[string]*st
+	doMarshalUnmarshal(t, &s4, &s5)
 }
