@@ -101,6 +101,16 @@ func (ti *typeInfo) mapStrDump(buf *Buffer) (reflect.Value, error) {
 	return reflect.ValueOf(s), err
 }
 
+func (ti *typeInfo) mapPointerSave(value reflect.Value, buf *Buffer) error {
+	s := value.Pointer()
+	return ti.pointerSave(Ptr(&s), buf)
+}
+
+func (ti *typeInfo) mapPointerDump(buf *Buffer) (reflect.Value, error) {
+	v, err := ti.info[0].mapDump(&ti.info[0], buf)
+	return v.Addr(), err
+}
+
 func (ti *typeInfo) mapTimeSave(value reflect.Value, buf *Buffer) error {
 	s := value.Interface().(time.Time)
 	return ti.timeSave(Ptr(&s), buf)

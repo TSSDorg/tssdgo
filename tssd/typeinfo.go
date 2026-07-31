@@ -377,6 +377,26 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 	return nil
 }
 
+
+func (ti *typeInfo) pointerSave(src Ptr, buf *Buffer) error {
+	// Pointer do nothing, just forward to child do
+	pp := (**byte)(src)
+	if (*pp == nil ) {
+		return nil
+	}
+	return ti.info[0].save(&ti.info[0], Ptr(*pp), buf)
+}
+
+func (ti *typeInfo) pointerDump(buf *Buffer, dest Ptr) error {
+	pp := (**byte)(dest)
+	if (*pp == nil) {
+		ss := make([]byte, ti.info[0].size)
+		*pp = &ss[0]
+	}
+	return ti.info[0].dump(&ti.info[0], buf, Ptr(*pp))
+}
+
+
 func (ti *typeInfo) marshal(src any) (*Buffer, error) {
 	buf := &Buffer{}
 	err := ti.marshalTo(src, buf)
@@ -490,6 +510,14 @@ func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 		ti.setType(toTSSDType(field.Kind()))
 		ti.isFixedLength = true
 		ti.mapSave, ti.mapDump = (*typeInfo).mapSimpleSave, (*typeInfo).mapSimpleDump
+
+	case reflect.Pointer:
+		v := value.Type().Elem()
+		ti.save, ti.dump = (*typeInfo).pointerSave, (*typeInfo).pointerDump
+		ti.mapSave, ti.mapDump = (*typeInfo).mapPointerSave, (*typeInfo).mapPointerDump
+		ti.info = make([]typeInfo, 1)
+		ti.info[0].root = ti.root
+		(&ti.info[0]).doParse(reflect.New(v).Elem().Interface(), nil)
 
 	case reflect.String:
 		ti.save = (*typeInfo).strSave
