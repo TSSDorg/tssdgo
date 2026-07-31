@@ -81,13 +81,9 @@ func (ti *typeInfo) mapPointerSave(value reflect.Value, buf *Buffer) error {
 }
 
 func (ti *typeInfo) mapPointerDump(buf *Buffer) (reflect.Value, error) {
-	//v, err := ti.info[0].mapDump(&ti.info[0], buf)
-	//return v.Addr(), err
-	d := reflect.New(ti.rtype)
-	d0 := reflect.NewAt(ti.info[0].rtype, d.UnsafePointer())
-	//var s *byte = nil
-	err := ti.info[0].dump(&ti.info[0], buf, d0.UnsafePointer())
-	return d.Elem(), err
+	obj := reflect.New(ti.info[0].rtype)
+	err := ti.info[0].dump(&ti.info[0], buf, obj.UnsafePointer())
+	return obj, err
 }
 
 func (ti *typeInfo) mapTimeSave(value reflect.Value, buf *Buffer) error {

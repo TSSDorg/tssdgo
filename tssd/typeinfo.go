@@ -23,7 +23,7 @@ type typeInfo struct {
 	save          saveFunc
 	dump          dumpFunc
 	size          int
-	field         int       //n-th field
+	field         int //n-th field
 	offset        Size_t
 	name          string
 	stype         []byte //all the type stream, includeing fields
@@ -334,10 +334,7 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 		ktype := ti.rtype.Key()
 		vtype := ti.rtype.Elem()
 
-		var kk, vv reflect.Value
 		for k := 0; k < mapLen; k++ {
-			key := reflect.New(ktype).Elem()
-			value := reflect.New(vtype).Elem()
 			b, err = buf.ReadByte()
 			if err != nil {
 				return err
@@ -345,12 +342,11 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 			if b != byte(Tdictk) {
 				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
 			}
-
-			kk, err = ti.info[0].mapDump(&ti.info[0], buf)
+			key := reflect.New(ktype)
+			err = ti.info[0].dump(&ti.info[0], buf, key.UnsafePointer())
 			if err != nil {
 				return err
 			}
-			key.Set(kk.Convert(ktype))
 
 			b, err = buf.ReadByte()
 			if err != nil {
@@ -359,14 +355,12 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 			if b != byte(Tdictv) {
 				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
 			}
-
-			vv, err = ti.info[1].mapDump(&ti.info[1], buf)
+			value := reflect.New(vtype)
+			err = ti.info[1].dump(&ti.info[1], buf, value.UnsafePointer())
 			if err != nil {
 				return err
 			}
-			value.Set(vv.Convert(value.Type()))
-
-			mvalue.SetMapIndex(key, value)
+			mvalue.SetMapIndex(key.Elem(), value.Elem())
 		}
 		reflect.NewAt(ti.rtype, dest).Elem().Set(mvalue)
 	case -ti.Type:
@@ -377,11 +371,10 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 	return nil
 }
 
-
 func (ti *typeInfo) pointerSave(src Ptr, buf *Buffer) error {
 	// Pointer do nothing, just forward to child do
 	pp := (**byte)(src)
-	if (*pp == nil ) {
+	if *pp == nil {
 		return nil
 	}
 	return ti.info[0].save(&ti.info[0], Ptr(*pp), buf)
@@ -389,13 +382,12 @@ func (ti *typeInfo) pointerSave(src Ptr, buf *Buffer) error {
 
 func (ti *typeInfo) pointerDump(buf *Buffer, dest Ptr) error {
 	pp := (**byte)(dest)
-	if (*pp == nil) {
-		ss := make([]byte, ti.info[0].size)
-		*pp = &ss[0]
+	if *pp == nil {
+		obj := reflect.New(ti.info[0].rtype)
+		*pp = (*byte)(obj.UnsafePointer())
 	}
 	return ti.info[0].dump(&ti.info[0], buf, Ptr(*pp))
 }
-
 
 func (ti *typeInfo) marshal(src any) (*Buffer, error) {
 	buf := &Buffer{}
@@ -481,14 +473,13 @@ func shouldIgnore(intf any, field int) bool {
 
 	tag := fields.Field(field).Tag.Get(TSSD_FIELD_TAG_KEY)
 	tags := strings.Split(tag, TSSD_FIELD_TAG_SPLITER)
-	for i:=0; i<len(tags); i++ {
+	for i := 0; i < len(tags); i++ {
 		if tags[i] == TSSD_FIELD_TAG_IGNORE {
 			return true
 		}
 	}
 	return false
 }
-
 
 func (ti *typeInfo) doParse(intf any, typs []byte) *typeInfo {
 
