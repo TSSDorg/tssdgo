@@ -122,6 +122,35 @@ func TestMapOutNotClean(t *testing.T) {
 	doMarshalUnmarshal(t, &m, &m2)
 }
 
+func TestMapInMapNil(t *testing.T) {
+
+	v1 := map[int]string {
+		123: "hello",
+	}
+
+	var s1 = map[int]map[int]string {
+		234: v1,
+	}
+
+	var s2 = map[int]map[int]string {
+		567: v1,
+	}
+
+	var s3 = map[int]map[int]string {
+		234: nil,
+	}
+	// 0 -> 0
+	doMarshalUnmarshal(t, &map[int]map[int]string{}, &map[int]map[int]string{})
+	// 1 -> 0
+	doMarshalUnmarshal(t, &s1, &map[int]map[int]string{})
+	// 1 -> 1
+	doMarshalUnmarshal(t, &s1, &s2)
+
+	doMarshalUnmarshal(t, &s3, &map[int]map[int]string{})
+}
+
+
+
 func TestSaveDumpEmptyMapStruct(t *testing.T) {
 	fmt.Println("TestSaveDumpMapStruct")
 	s1 := stmap{}
@@ -575,3 +604,5 @@ func TestMapInMap(t *testing.T) {
 		t.Error("TestMap failed")
 	}
 }
+
+

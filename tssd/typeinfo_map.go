@@ -236,15 +236,13 @@ func (ti *typeInfo) mapMergeSliceValueDump(buf *Buffer) (v reflect.Value, err er
 }
 
 func (ti *typeInfo) mapMapValueSave(value reflect.Value, buf *Buffer) error {
-
+	if ti.appendType(value, buf, ti.Type) {
+		return nil
+	}
 	arrayN := value.Len()
-
-	buf.AppendByte(byte(ti.Type))
 	index, pos := buf.writePos()
 	size := buf.Size
-
 	buf.appendSize4(0).appendSize2(arrayN)
-
 	keys := value.MapKeys()
 	for _, k := range keys {
 		v := value.MapIndex(k)
@@ -254,7 +252,6 @@ func (ti *typeInfo) mapMapValueSave(value reflect.Value, buf *Buffer) error {
 		ti.info[1].mapSave(&ti.info[1], v, buf)
 	}
 	buf.updateSize(index, pos, buf.Size-size-TSSD_SIZET_LENGTH)
-
 	return nil
 }
 
