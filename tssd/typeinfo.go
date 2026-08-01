@@ -180,18 +180,15 @@ func (ti *typeInfo) objDump(buf *Buffer, dest Ptr) error {
 }
 
 // return true if src is nil, and we append -type to buf
-func (ti *typeInfo) appendType(value reflect.Value, buf *Buffer, typs ...int8) (noData bool) {
-	for i := 0; i < len(typs)-1; i++ {
+func (ti *typeInfo) appendType(value reflect.Value, buf *Buffer, typs ...int8) bool {
+	if value.Kind() != reflect.Array && value.IsNil() {
+		buf.AppendByte(byte(-typs[0]))
+		return true
+	}
+	for i := range typs {
 		buf.AppendByte(byte(typs[i]))
 	}
-	last := typs[len(typs)-1]
-	if value.Kind() != reflect.Array && value.IsNil() {
-		last = -last
-		noData = true
-	}
-	buf.AppendByte(byte(last))
-
-	return noData
+	return false
 }
 
 func (ti *typeInfo) sliceSave(src Ptr, buf *Buffer) error {
@@ -276,15 +273,19 @@ func (ti *typeInfo) mergeSliceSave(src Ptr, buf *Buffer) error {
 }
 
 func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
-	b, err := buf.Read(make([]byte, 2))
+	b, err := buf.ReadByte()
 	if err != nil {
 		return err
 	}
-	if int8(b[0]) != ti.Type {
-		return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
-	}
-	switch int8(b[1]) {
-	case ti.info[0].Type: //[0]: Tarraym, [1]: elementType
+	switch int8(b) {
+	case ti.Type: //[0]: Tarraym, [1]: elementType
+		b2, err := buf.ReadByte()
+		if err != nil {
+			return err
+		}
+		if b2 != byte(ti.info[0].Type) {
+			return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b2, ti.info[0].Type)
+		}
 		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
@@ -303,10 +304,10 @@ func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
 
 		//TODO, for big-endian, we need copy one by one
 		buf.Read(Slice(addr, Size_t(arrayN*ti.info[0].size)))
-	case -ti.info[0].Type:
+	case -ti.Type:
 		reflect.NewAt(ti.rtype, dest).Elem().SetZero()
 	default:
-		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
+		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
 	return nil
 }
@@ -399,6 +400,8 @@ func (ti *typeInfo) pointerSave(src Ptr, buf *Buffer) error {
 	// Pointer do nothing, just forward to child do
 	pp := (**byte)(src)
 	if *pp == nil {
+		// we need a -type of child to indicate this pointer is nil
+		buf.AppendByte(byte(-ti.info[0].Type))
 		return nil
 	}
 	return ti.info[0].save(&ti.info[0], Ptr(*pp), buf)
@@ -406,6 +409,16 @@ func (ti *typeInfo) pointerSave(src Ptr, buf *Buffer) error {
 
 func (ti *typeInfo) pointerDump(buf *Buffer, dest Ptr) error {
 	pp := (**byte)(dest)
+	b, err := buf.PeekByte()
+	if err != nil {
+		return err
+	}
+	if int8(b) == -ti.info[0].Type {
+		buf.ReadByte() //consume the -type
+		// reset dest to nil
+		*pp = nil
+		return nil
+	}
 	if *pp == nil {
 		obj := reflect.New(ti.info[0].rtype)
 		*pp = (*byte)(obj.UnsafePointer())

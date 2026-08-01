@@ -1130,6 +1130,10 @@ func TestPointer(t *testing.T) {
 	}
 	var s2 st
 	doMarshalUnmarshal(t, &s1, &s2)
+	doMarshalUnmarshal(t, &st{}, &st{})
+	doMarshalUnmarshal(t, &st{new(""), nil}, &st{})
+	doMarshalUnmarshal(t, &st{new(""), nil}, &st{new("xxx"), nil})
+	doMarshalUnmarshal(t, &st{nil, new(int32(123))}, &st{new("xxx"), nil})
 }
 
 func TestPointerSlice(t *testing.T) {
