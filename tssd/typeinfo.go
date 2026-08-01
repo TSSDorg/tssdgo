@@ -179,17 +179,33 @@ func (ti *typeInfo) objDump(buf *Buffer, dest Ptr) error {
 	return nil
 }
 
+// return true if src is nil, and we append -type to buf
+func (ti *typeInfo) appendType(value reflect.Value, buf *Buffer, typs ...int8) (noData bool) {
+	for i := 0; i < len(typs)-1; i++ {
+		buf.AppendByte(byte(typs[i]))
+	}
+	last := typs[len(typs)-1]
+	if value.Kind() != reflect.Array && value.IsNil() {
+		last = -last
+		noData = true
+	}
+	buf.AppendByte(byte(last))
+
+	return noData
+}
+
 func (ti *typeInfo) sliceSave(src Ptr, buf *Buffer) error {
+	value := reflect.NewAt(ti.rtype, src).Elem()
+	if ti.appendType(value, buf, ti.Type) {
+		return nil
+	}
+
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
-		p := *(*[]byte)(src)
-		if arrayN = len(p); arrayN > 0 {
-			addr = Size_t(Ptr(&p[0]))
-		}
+		addr = value.Pointer()
+		arrayN = value.Len()
 	}
-
-	buf.AppendByte(byte(ti.Type))
 
 	index, pos := buf.writePos()
 	size := buf.Size
@@ -214,26 +230,24 @@ func (ti *typeInfo) sliceDump(buf *Buffer, dest Ptr) error {
 			return err
 		}
 
-		addr := dest
+		addr := Size_t(dest)
 		if ti.rtype.Kind() == reflect.Slice {
-			p := (*[]byte)(dest)
-			if cap(*p) < arrayN { //for slice, need pre-alloc
-				*p = make([]byte, arrayN*ti.info[0].size)
+			value := reflect.NewAt(ti.rtype, dest).Elem()
+			if value.IsNil() || value.Cap() < arrayN { //for slice, need pre-alloc
+				ss := reflect.MakeSlice(ti.rtype, arrayN, arrayN)
+				value.Set(ss)
 			}
-
-			*p = (*p)[0:arrayN] //set size
-			if arrayN > 0 {
-				addr = Ptr(&((*p)[0]))
-			}
+			value.SetLen(arrayN) //set size
+			addr = value.Pointer()
 		}
 
 		for i := range arrayN {
-			if err = ti.info[0].dump(&ti.info[0], buf, Ptr(Size_t(addr)+Size_t(ti.info[0].size*i))); err != nil {
+			if err = ti.info[0].dump(&ti.info[0], buf, Ptr(addr+Size_t(ti.info[0].size*i))); err != nil {
 				return err
 			}
 		}
 	case -ti.Type:
-		//skip this field
+		reflect.NewAt(ti.rtype, dest).Elem().SetZero()
 	default:
 		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
@@ -242,16 +256,18 @@ func (ti *typeInfo) sliceDump(buf *Buffer, dest Ptr) error {
 
 // [Tarraym][Ttype][size][arrayN][data]
 func (ti *typeInfo) mergeSliceSave(src Ptr, buf *Buffer) error {
+	value := reflect.NewAt(ti.rtype, src).Elem()
+	if ti.appendType(value, buf, ti.Type, ti.info[0].Type) {
+		return nil
+	}
+
 	arrayN := ti.size
 	addr := Size_t(src)
 	if ti.rtype.Kind() == reflect.Slice {
-		p := *(*[]byte)(src)
-		if arrayN = len(p); arrayN > 0 {
-			addr = Size_t(Ptr(&p[0]))
-		}
+		addr = value.Pointer()
+		arrayN = value.Len()
 	}
 
-	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
 	totalSize := ti.info[0].size * arrayN
 	buf.appendSize4(TSSD_SIZEA_LENGTH + totalSize).appendSize2(arrayN)
 
@@ -264,32 +280,31 @@ func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
 	if err != nil {
 		return err
 	}
-	switch int8(b[0]) {
-	case ti.Type: //[0]: Tarraym, [1]: elementType
-		if int8(b[1]) != ti.info[0].Type {
-			return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[1], ti.info[0].Type)
-		}
+	if int8(b[0]) != ti.Type {
+		return fmt.Errorf("%w [element type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
+	}
+	switch int8(b[1]) {
+	case ti.info[0].Type: //[0]: Tarraym, [1]: elementType
 		_, arrayN, err := buf.checkDumpSize()
 		if err != nil {
 			return err
 		}
 		addr := dest
 		if ti.rtype.Kind() == reflect.Slice {
-			p := (*[]byte)(dest)
-			if cap(*p) < arrayN { //for slice, need pre-alloc
-				*p = make([]byte, arrayN*ti.info[0].size)
-			}
 
-			*p = (*p)[0:arrayN] //set size
-			if arrayN > 0 {
-				addr = Ptr(&((*p)[0]))
+			value := reflect.NewAt(ti.rtype, dest).Elem()
+			if value.IsNil() || value.Cap() < arrayN { //for slice, need pre-alloc
+				ss := reflect.MakeSlice(ti.rtype, arrayN, arrayN)
+				value.Set(ss)
 			}
+			value.SetLen(arrayN) //set size
+			addr = value.UnsafePointer()
 		}
 
 		//TODO, for big-endian, we need copy one by one
 		buf.Read(Slice(addr, Size_t(arrayN*ti.info[0].size)))
-	case -ti.Type:
-		//skip this field
+	case -ti.info[0].Type:
+		reflect.NewAt(ti.rtype, dest).Elem().SetZero()
 	default:
 		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b[0], ti.Type)
 	}
@@ -297,11 +312,12 @@ func (ti *typeInfo) mergeSliceDump(buf *Buffer, dest Ptr) error {
 }
 
 func (ti *typeInfo) dictSave(src Ptr, buf *Buffer) error {
-
 	value := reflect.NewAt(ti.rtype, src).Elem()
-	keys := value.MapKeys()
+	if ti.appendType(value, buf, ti.Type) {
+		return nil
+	}
 
-	buf.AppendByte(byte(ti.Type))
+	keys := value.MapKeys()
 
 	index, pos := buf.writePos()
 	size := buf.Size
@@ -364,7 +380,7 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 		}
 		reflect.NewAt(ti.rtype, dest).Elem().Set(mvalue)
 	case -ti.Type:
-		//skip this field
+		reflect.NewAt(ti.rtype, dest).Elem().SetZero()
 	default:
 		return fmt.Errorf("%w [field type mismatch %d %d]", ErrorInvalidTSSDData, b, ti.Type)
 	}
