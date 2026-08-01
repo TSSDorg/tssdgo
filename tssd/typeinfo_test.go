@@ -36,8 +36,48 @@ func doMarshalUnmarshal(t *testing.T, in any, out any, opts ...cmp.Option) {
 	}
 
 	if !cmp.Equal(in, out, opts...) {
-		t.Error("cmp equal fail")
+		info := getCallerInfo(2)
+		fmt.Println("stack:", info, " diff: ", cmp.Diff(in, out, opts...))
+		t.Error("stack", info, " cmp equal fail")
 	}
+}
+
+func TestNilSlice(t *testing.T) {
+	type st struct {
+		Ss []string
+	}
+
+	doMarshalUnmarshal(t, &st{}, &st{})
+	doMarshalUnmarshal(t, &st{nil}, &st{})
+	doMarshalUnmarshal(t, &st{nil}, &st{nil})
+	doMarshalUnmarshal(t, &st{}, &st{nil})
+	doMarshalUnmarshal(t, &st{nil}, &st{make([]string, 0)})
+	doMarshalUnmarshal(t, &st{nil}, &st{[]string{}})
+	doMarshalUnmarshal(t, &st{nil}, &st{[]string{"hello", "world"}})
+	doMarshalUnmarshal(t, &st{make([]string, 0)}, &st{})
+	doMarshalUnmarshal(t, &st{make([]string, 0)}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]string{}}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]string{"hello", "world"}}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]string{"hello", "world"}}, &st{[]string{"foo", "bar"}})
+}
+
+func TestNilMergeSlice(t *testing.T) {
+	type st struct {
+		Ss []int
+	}
+
+	doMarshalUnmarshal(t, &st{}, &st{})
+	doMarshalUnmarshal(t, &st{nil}, &st{})
+	doMarshalUnmarshal(t, &st{nil}, &st{nil})
+	doMarshalUnmarshal(t, &st{}, &st{nil})
+	doMarshalUnmarshal(t, &st{nil}, &st{make([]int, 0)})
+	doMarshalUnmarshal(t, &st{nil}, &st{[]int{}})
+	doMarshalUnmarshal(t, &st{nil}, &st{[]int{1, 2, 3}})
+	doMarshalUnmarshal(t, &st{make([]int, 0)}, &st{})
+	doMarshalUnmarshal(t, &st{make([]int, 0)}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]int{}}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]int{1, 2, 3}}, &st{nil})
+	doMarshalUnmarshal(t, &st{[]int{1, 2, 3}}, &st{[]int{4, 5}})
 }
 
 type S1 struct {
@@ -665,22 +705,11 @@ func testBasicInStruct[T comparable](in []T, t *testing.T) {
 
 func testBasicInMap[T comparable, V any](in []T, in2 []V, t *testing.T) {
 	var m = make(map[T]V, 0)
-
-	ti := parse(m)
 	//fmt.Println("testBasicInMap:", in[0], in[1])
 	for i := range in {
 		m[in[i]] = in2[i]
-		dest, err := ti.marshal(Ptr(&m))
-		if err != nil {
-			t.Error("testBasicInMap marshal failed")
-		}
-		//fmt.Println("testBasicInMap in[i]:", in[i], in2[i], len(dest))
-
 		var out map[T]V
-		err = ti.unmarshal(dest, Ptr(&out))
-		if err != nil || !reflect.DeepEqual(m, out) {
-			t.Error("testBasicInMap failed")
-		}
+		doMarshalUnmarshal(t, &m, &out)
 	}
 }
 
@@ -1224,4 +1253,29 @@ func TestPointerInMapToMap(t *testing.T) {
 	}
 	var s5 map[string]*map[string]*st
 	doMarshalUnmarshal(t, &s4, &s5)
+}
+
+func TestSliceOutNotClean(t *testing.T) {
+	m := []int{123, 456, 789}
+	m2 := []int{12345}
+	// 0 -> 0
+	doMarshalUnmarshal(t, &[]int{}, &[]int{})
+	// 1 -> 0
+	doMarshalUnmarshal(t, &m, &[]int{})
+	// 1 -> 1
+	doMarshalUnmarshal(t, &m, &m2)
+}
+
+func TestNilString(t *testing.T) {
+	type st struct {
+		Ss string
+	}
+
+	doMarshalUnmarshal(t, &st{}, &st{})
+	doMarshalUnmarshal(t, &st{""}, &st{""})
+	doMarshalUnmarshal(t, &st{""}, &st{"hello"})
+	doMarshalUnmarshal(t, &st{""}, &st{})
+	doMarshalUnmarshal(t, &st{"hello"}, &st{})
+	doMarshalUnmarshal(t, &st{"hello"}, &st{""})
+	doMarshalUnmarshal(t, &st{"hello"}, &st{"foo"})
 }

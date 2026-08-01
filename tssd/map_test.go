@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 	"unsafe"
+	// "github.com/google/go-cmp/cmp"
 )
 
 type st[K comparable, V any] struct {
@@ -104,27 +105,36 @@ type stmap struct {
 	M map[string]stin
 }
 
-/*
+func TestMapOutNotClean(t *testing.T) {
+	m := map[int]string{
+		123: "hello",
+	}
+
+	m2 := map[int]string{
+		789: "helloxxxxx",
+	}
+
+	// 0 -> 0
+	doMarshalUnmarshal(t, &map[int]string{}, &map[int]string{})
+	// 1 -> 0
+	doMarshalUnmarshal(t, &m, &map[int]string{})
+	// 1 -> 1
+	doMarshalUnmarshal(t, &m, &m2)
+}
+
 func TestSaveDumpEmptyMapStruct(t *testing.T) {
 	fmt.Println("TestSaveDumpMapStruct")
-
 	s1 := stmap{}
-	s1.I  = 1
-	s1.M = nil
-
-	c := parse(s1)
-	buf, _ := c.marshal(&s1, make([]byte, 0, 2048))
-	fmt.Println(c)
-
+	s1.I = 1
+	//s1.M = nil
 	var s2 stmap
-	c.unmarshal(buf, &s2)
+	s2.I = 2
+	s2.M = map[string]stin{}
 
-	fmt.Println(s1, s2)
-	if !reflect.DeepEqual(s1, s2) {
-		t.Error("TestSaveDumpMapStruct error:", s1, s2)
-	}
+	doMarshalUnmarshal(t, &s1, &s2)
+
+	doMarshalUnmarshal(t, &s1, &stmap{})
 }
-*/
 
 func TestSaveDumpMapStruct(t *testing.T) {
 	fmt.Println("TestSaveDumpMapStruct")
@@ -266,8 +276,6 @@ func TestSaveDumpMapString(t *testing.T) {
 }
 
 func TestSaveDumpMapSimpleSlice(t *testing.T) {
-	
-
 	type stmap struct {
 		I int
 		M map[string][]int
@@ -290,7 +298,7 @@ func TestSaveDumpMapSimpleSlice(t *testing.T) {
 	if !reflect.DeepEqual(s1, s2) {
 		t.Error("TestSaveDumpMapSimpleSlice error")
 	}
-		
+
 }
 
 func TestSaveDumpMapStructSlice(t *testing.T) {
@@ -472,7 +480,6 @@ func TestMapArraySlice(t *testing.T) {
 	}
 }
 
-
 func TestMapInMapEmpty(t *testing.T) {
 	type si struct {
 		S string
@@ -480,8 +487,8 @@ func TestMapInMapEmpty(t *testing.T) {
 	}
 
 	type so struct {
-		I  int
-		M  map[string]si
+		I int
+		M map[string]si
 	}
 
 	var si1 si
@@ -502,13 +509,12 @@ func TestMapInMapEmpty(t *testing.T) {
 	//s1.Si = si1
 	//s1.S = "sfe"
 
-	s1.M= make(map[string]si)
+	s1.M = make(map[string]si)
 	s1.M["o1"] = si1
 
 	//s1.M[1] = make(map[string]int)
 	//s1.M[1]["o2"] = 133
 
-	
 	buf, _ := container.marshal(&s1)
 
 	container.unmarshal(buf, &s2)
@@ -522,7 +528,6 @@ func TestMapInMapEmpty(t *testing.T) {
 	}
 }
 
-
 func TestMapInMap(t *testing.T) {
 	type si struct {
 		S string
@@ -530,8 +535,8 @@ func TestMapInMap(t *testing.T) {
 	}
 
 	type so struct {
-		I  int
-		M  map[string]si
+		I int
+		M map[string]si
 	}
 
 	var si1 si
@@ -552,13 +557,12 @@ func TestMapInMap(t *testing.T) {
 	//s1.Si = si1
 	//s1.S = "sfe"
 
-	s1.M= make(map[string]si)
+	s1.M = make(map[string]si)
 	s1.M["o1"] = si1
 
 	//s1.M[1] = make(map[string]int)
 	//s1.M[1]["o2"] = 133
 
-	
 	buf, _ := container.marshal(&s1)
 
 	container.unmarshal(buf, &s2)

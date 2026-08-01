@@ -3,7 +3,9 @@ package tssd
 import (
 	"fmt"
 	"math/rand"
+	"path"
 	"reflect"
+	"runtime"
 	"time"
 )
 
@@ -156,4 +158,15 @@ func MakeMap(intf any) reflect.Value {
 	}
 
 	return v
+}
+
+func getCallerInfo(skip int) (info string) {
+	pc, file, lineNo, ok := runtime.Caller(skip)
+	if !ok {
+		info = "runtime.Caller() failed"
+		return
+	}
+	funcName := runtime.FuncForPC(pc).Name()
+	fileName := path.Base(file)
+	return fmt.Sprintf("FuncName:%s, file:%s, line:%d ", path.Base(funcName), fileName, lineNo)
 }

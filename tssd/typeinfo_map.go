@@ -52,7 +52,6 @@ func uintDestAddr() Ptr {
 	return Ptr(s)
 }
 
-
 func (ti *typeInfo) mapSimpleSave(value reflect.Value, buf *Buffer) error {
 	s := simpleSave[ti.rtype.Kind()](value)
 	return ti.memAppend(s, buf)
@@ -141,10 +140,10 @@ func (ti *typeInfo) mapStructDump(buf *Buffer) (v reflect.Value, err error) {
 }
 
 func (ti *typeInfo) mapSliceValueSave(value reflect.Value, buf *Buffer) error {
-
+	if ti.appendType(value, buf, ti.Type) {
+		return nil
+	}
 	arrayN := value.Len()
-
-	buf.AppendByte(byte(ti.Type))
 	index, pos := buf.writePos()
 	size := buf.Size
 	buf.appendSize4(0).appendSize2(arrayN)
@@ -188,10 +187,11 @@ func (ti *typeInfo) mapSliceValueDump(buf *Buffer) (v reflect.Value, err error) 
 }
 
 func (ti *typeInfo) mapMergeSliceValueSave(value reflect.Value, buf *Buffer) error {
-
+	if ti.appendType(value, buf, ti.Type, ti.info[0].Type) {
+		return nil
+	}
 	arrayN := value.Len()
-	buf.Append([]byte{byte(ti.Type), byte(ti.info[0].Type)})
-	totalSize := ti.info[0].size * arrayN + TSSD_SIZEA_LENGTH
+	totalSize := ti.info[0].size*arrayN + TSSD_SIZEA_LENGTH
 	buf.appendSize4(totalSize).appendSize2(arrayN)
 
 	for i := range arrayN {
@@ -316,4 +316,3 @@ func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
 	}
 	return v, nil
 }
-
