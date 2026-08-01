@@ -266,48 +266,7 @@ func (ti *typeInfo) mapMapValueDump(buf *Buffer) (v reflect.Value, err error) {
 	//var size int
 	switch int8(b) {
 	case ti.Type:
-		_, mapLen, err := buf.checkDumpSize()
-		if err != nil {
-			return v, err
-		}
-
-		v = reflect.MakeMapWithSize(ti.rtype, mapLen)
-		ktype := ti.rtype.Key()
-		vtype := ti.rtype.Elem()
-
-		var kk, vv reflect.Value
-		for k := 0; k < mapLen; k++ {
-			key := reflect.New(ktype).Elem()
-			value := reflect.New(vtype).Elem()
-			b, err = buf.ReadByte()
-			if err != nil {
-				return v, err
-			}
-			if b != byte(Tdictk) {
-				return v, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
-			}
-
-			kk, err = ti.info[0].mapDump(&ti.info[0], buf)
-			if err != nil {
-				return v, err
-			}
-			key.Set(kk.Convert(ktype))
-			b, err = buf.ReadByte()
-			if err != nil {
-				return v, err
-			}
-			if b != byte(Tdictv) {
-				return v, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
-			}
-
-			vv, err = ti.info[1].mapDump(&ti.info[1], buf)
-			if err != nil {
-				return v, err
-			}
-			value.Set(vv.Convert(value.Type()))
-
-			v.SetMapIndex(key, value)
-		}
+		return ti.makeDumpMap(buf)
 	case -ti.Type:
 		//skip this field
 		return v, nil
