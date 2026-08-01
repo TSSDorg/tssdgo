@@ -334,6 +334,47 @@ func (ti *typeInfo) dictSave(src Ptr, buf *Buffer) error {
 	return nil
 }
 
+func (ti *typeInfo) makeDumpMap(buf *Buffer) (value reflect.Value, err error) {
+	_, mapLen, err := buf.checkDumpSize()
+	if err != nil {
+		return value, err
+	}
+
+	mvalue := reflect.MakeMapWithSize(ti.rtype, mapLen)
+	ktype := ti.rtype.Key()
+	vtype := ti.rtype.Elem()
+
+	for k := 0; k < mapLen; k++ {
+		b, err := buf.ReadByte()
+		if err != nil {
+			return value, err
+		}
+		if b != byte(Tdictk) {
+			return value, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
+		}
+		key := reflect.New(ktype)
+		err = ti.info[0].dump(&ti.info[0], buf, key.UnsafePointer())
+		if err != nil {
+			return value, err
+		}
+
+		b, err = buf.ReadByte()
+		if err != nil {
+			return value, err
+		}
+		if b != byte(Tdictv) {
+			return value, fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
+		}
+		value := reflect.New(vtype)
+		err = ti.info[1].dump(&ti.info[1], buf, value.UnsafePointer())
+		if err != nil {
+			return value, err
+		}
+		mvalue.SetMapIndex(key.Elem(), value.Elem())
+	}
+	return mvalue, nil
+}
+
 func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 	b, err := buf.ReadByte()
 	if err != nil {
@@ -341,42 +382,9 @@ func (ti *typeInfo) dictDump(buf *Buffer, dest Ptr) error {
 	}
 	switch int8(b) {
 	case ti.Type:
-		_, mapLen, err := buf.checkDumpSize()
+		mvalue, err := ti.makeDumpMap(buf)
 		if err != nil {
 			return err
-		}
-
-		mvalue := reflect.MakeMapWithSize(ti.rtype, mapLen)
-		ktype := ti.rtype.Key()
-		vtype := ti.rtype.Elem()
-
-		for k := 0; k < mapLen; k++ {
-			b, err = buf.ReadByte()
-			if err != nil {
-				return err
-			}
-			if b != byte(Tdictk) {
-				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictk)
-			}
-			key := reflect.New(ktype)
-			err = ti.info[0].dump(&ti.info[0], buf, key.UnsafePointer())
-			if err != nil {
-				return err
-			}
-
-			b, err = buf.ReadByte()
-			if err != nil {
-				return err
-			}
-			if b != byte(Tdictv) {
-				return fmt.Errorf("%w [map field type mismatch: %d %d", ErrorInvalidTSSDData, b, Tdictv)
-			}
-			value := reflect.New(vtype)
-			err = ti.info[1].dump(&ti.info[1], buf, value.UnsafePointer())
-			if err != nil {
-				return err
-			}
-			mvalue.SetMapIndex(key.Elem(), value.Elem())
 		}
 		reflect.NewAt(ti.rtype, dest).Elem().Set(mvalue)
 	case -ti.Type:
