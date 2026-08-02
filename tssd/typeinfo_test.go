@@ -1149,23 +1149,35 @@ func TestPointerSlice(t *testing.T) {
 	doMarshalUnmarshal(t, &s1, &s2)
 
 	//test slice slice
-
 	var s3 = []st{
 		s1, s1,
 	}
-	var s4 []st
 
-	doMarshalUnmarshal(t, &s3, &s4)
+	doMarshalUnmarshal(t, &s3, &([]st{}))
+
+	s1.Str[0] = nil
+	s1.I[1] = nil
+	doMarshalUnmarshal(t, &s1, &s2)
+
+	s1.I = nil
+	doMarshalUnmarshal(t, &s1, &s2)
+
+	var s5 = []st{
+		s1, s2,
+	}
+	doMarshalUnmarshal(t, &s5, &([]st{}))
 }
 
 func TestPointerInMapSimple(t *testing.T) {
-
-	s := int32(123)
-
 	s3 := map[string]*int32{
-		"hello": &s,
+		"hello": new(int32(123)),
 	}
 	var s2 map[string]*int32
+	doMarshalUnmarshal(t, &s3, &s2)
+
+	s3["hello"] = nil
+	doMarshalUnmarshal(t, &s3, &s2)
+	s3[""] = new(int32(456))
 	doMarshalUnmarshal(t, &s3, &s2)
 }
 
@@ -1176,18 +1188,12 @@ func TestPointerInMapString(t *testing.T) {
 	}
 	var s2 map[int]*string
 	doMarshalUnmarshal(t, &s1, &s2)
-}
 
-func TestPointerInMapStruct(t *testing.T) {
-	type st struct {
-		Str *string
-		I   *int
-	}
-	s1 := map[int32]*st{
-		int32(123): &st{new("hello"), new(456)},
-	}
-	var s2 map[int32]*st
+	s1[123] = nil
 	doMarshalUnmarshal(t, &s1, &s2)
+	s1[456] = new("world")
+	doMarshalUnmarshal(t, &s1, &s2)
+
 }
 
 func TestPointerInMap(t *testing.T) {
@@ -1205,6 +1211,14 @@ func TestPointerInMap(t *testing.T) {
 		"foo":   &s1,
 	}
 	var s2 map[string]*st
+	doMarshalUnmarshal(t, &s3, &s2)
+
+	s3["hello"] = nil
+	doMarshalUnmarshal(t, &s3, &s2)
+	s3["foo"] = nil
+	doMarshalUnmarshal(t, &s3, &s2)
+	s3["bar"] = &s1
+	s3["foo"] = &s1
 	doMarshalUnmarshal(t, &s3, &s2)
 }
 
@@ -1231,6 +1245,18 @@ func TestPointerInMapSlice(t *testing.T) {
 		"bar": &s1,
 	}
 	doMarshalUnmarshal(t, &s3, &s4)
+
+	s3["hello"].I[0] = nil
+	s3["foo"].Str[1] = nil
+	doMarshalUnmarshal(t, &s3, &s4)
+
+	s3["hello"] = nil
+	doMarshalUnmarshal(t, &s3, &s4)
+	s3["foo"] = nil
+	doMarshalUnmarshal(t, &s3, &s4)
+	s3[""] = &s1
+	s3["foo"] = &s2
+	doMarshalUnmarshal(t, &s3, &s4)
 }
 
 func TestPointerInMapToMap(t *testing.T) {
@@ -1256,6 +1282,18 @@ func TestPointerInMapToMap(t *testing.T) {
 		"edf": &s3,
 	}
 	var s5 map[string]*map[string]*st
+	doMarshalUnmarshal(t, &s4, &s5)
+
+	s3["hello"].I[0] = nil
+	s3["foo"].Str[1] = nil
+	doMarshalUnmarshal(t, &s4, &s5)
+
+	s3["hello"] = nil
+	doMarshalUnmarshal(t, &s4, &s5)
+	s3["foo"] = nil
+	doMarshalUnmarshal(t, &s4, &s5)
+	s3[""] = &s1
+	s3["foo"] = &s2
 	doMarshalUnmarshal(t, &s4, &s5)
 }
 
