@@ -20,6 +20,7 @@ type school struct {
 }
 
 type student struct {
+	Flat[student, *student]
 	ID    int64
 	Name  []string
 	Age   uint8
@@ -32,6 +33,15 @@ type student struct {
 	Schools []school
 	Courses map[string]course
 }
+
+func (this *student) Version() string {
+	return "V1"
+}
+
+func (this *student) Group() string {
+	return "STUDENT_GROUP"
+}
+
 
 var tiStudent *typeInfo
 var now = time.Now()
@@ -57,6 +67,7 @@ var pStudent = &student {
 
 func init() {
 	tiStudent = parse(student{})
+	Register(pStudent)
 }
 
 func BenchmarkTypeInfoMarshal(b *testing.B) {
@@ -98,5 +109,22 @@ func BenchmarkGobUnmarshal(b *testing.B) {
 	gob.NewEncoder(&network).Encode(pStudent)
 	for i := 0; i < b.N; i++ {
 		gob.NewDecoder(bytes.NewReader(network.Bytes())).Decode(&s)
+	}
+}
+
+func BenchmarkTSSDMarshal(b *testing.B) {
+	n := &Buffer {}
+	for i := 0; i < b.N; i++ {
+		MarshalTo(pStudent, n.Clear())
+	}
+}
+
+func BenchmarkTSSDUUnmarshal(b *testing.B) {
+	n := &Buffer {}
+	MarshalTo(pStudent, n)
+	var s student
+	for i := 0; i < b.N; i++ {
+		n.Rewind()
+		UnmarshalTo(n, &s)
 	}
 }

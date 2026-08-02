@@ -11,25 +11,30 @@ tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data w
 
 ## benchmark test
 ```
-$go test -v -bench="(TypeInfo*|Gob*)"
+$go test -v -bench="(TypeInfo*|Gob*|TSSD*)"
 
 goos: windows
 goarch: amd64
 pkg: github.com/tssdorg/tssdgo/tssd
 cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics
 BenchmarkTypeInfoMarshal
-BenchmarkTypeInfoMarshal-16               325309              3534 ns/op
+BenchmarkTypeInfoMarshal-16               337573              3499 ns/op
 BenchmarkGobMarshal
-BenchmarkGobMarshal-16                    194817              6439 ns/op
+BenchmarkGobMarshal-16                    170007              6618 ns/op
 BenchmarkTypeInfoUnmarshal
-BenchmarkTypeInfoUnmarshal-16             424189              2589 ns/op
+BenchmarkTypeInfoUnmarshal-16             420558              2667 ns/op
 BenchmarkGobUnmarshal
-BenchmarkGobUnmarshal-16                   63555             18255 ns/op
+BenchmarkGobUnmarshal-16                   63486             19122 ns/op
+BenchmarkTSSDMarshal
+BenchmarkTSSDMarshal-16                   217504              5373 ns/op
+BenchmarkTSSDUUnmarshal
+BenchmarkTSSDUUnmarshal-16                429708              2664 ns/op
 PASS
-ok      github.com/tssdorg/tssdgo/tssd  5.904s
+ok      github.com/tssdorg/tssdgo/tssd  8.220s
 
-TSSD's under typeinfo marshal nearly 2x faster than GOB
-TSSD's under typeinfo unmarshal nearly 7x faster than GOB
+TSSD(with fragments) marshal nearly 1.2x faster than GOB
+TSSD's underlying typeinfo marshal nearly 1.8x faster than GOB
+TSSD unmarshal nearly 7x faster than GOB
 
 ```
 
