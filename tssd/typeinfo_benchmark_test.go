@@ -73,11 +73,22 @@ func BenchmarkGobMarshal(b *testing.B) {
 	}
 }
 
+func TestStudentUnmarshal(t *testing.T) {
+	buf, _ := tiStudent.marshal(pStudent)
+	var s student
+	if err := tiStudent.unmarshalTo(buf, &s); err != nil {
+		t.Error("Failed to unmarshal student: ", err)
+	}
+}
+
 func BenchmarkTypeInfoUnmarshal(b *testing.B) {
 	buf, _ := tiStudent.marshal(pStudent)
 	var s student
 	for i := 0; i < b.N; i++ {
-		tiStudent.unmarshalTo(buf, &s)
+		buf.Rewind()
+		if err := tiStudent.unmarshalTo(buf, &s); err != nil {
+			b.Error("Failed to unmarshal student: ", err)
+		}
 	}
 }
 
