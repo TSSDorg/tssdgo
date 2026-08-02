@@ -8,6 +8,36 @@ tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data w
 - **struct migration support**: support receive old struct data and migration to the latest version
 - **less depenency**: depend github.com/eineder/printtree only, which for print TSSD data
 
+
+## benchmark test
+```
+$go test -v -bench="(TypeInfo*|Gob*|TSSD*)"
+
+goos: windows
+goarch: amd64
+pkg: github.com/tssdorg/tssdgo/tssd
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics
+BenchmarkTypeInfoMarshal
+BenchmarkTypeInfoMarshal-16               337573              3499 ns/op
+BenchmarkGobMarshal
+BenchmarkGobMarshal-16                    170007              6618 ns/op
+BenchmarkTypeInfoUnmarshal
+BenchmarkTypeInfoUnmarshal-16             420558              2667 ns/op
+BenchmarkGobUnmarshal
+BenchmarkGobUnmarshal-16                   63486             19122 ns/op
+BenchmarkTSSDMarshal
+BenchmarkTSSDMarshal-16                   217504              5373 ns/op
+BenchmarkTSSDUUnmarshal
+BenchmarkTSSDUUnmarshal-16                429708              2664 ns/op
+PASS
+ok      github.com/tssdorg/tssdgo/tssd  8.220s
+
+TSSD(with fragments) marshal nearly 1.2x faster than GOB
+TSSD's underlying typeinfo marshal nearly 1.8x faster than GOB
+TSSD unmarshal nearly 7x faster than GOB
+
+```
+
 ## quick start
 
 a simple [transer demo](https://github.com/TSSDorg/tssdgo/blob/main/examples/transfer/student.go)

@@ -1,0 +1,130 @@
+package tssd
+
+import (
+	"bytes"
+	"encoding/gob"
+	"time"
+	"testing"
+)
+
+type course struct {
+	Name string
+	TestTime time.Time
+	Score float32
+}
+
+type school struct {
+	Name string
+	Camp []string
+	EntryLeaveTime [2]time.Time
+}
+
+type student struct {
+	Flat[student, *student]
+	ID    int64
+	Name  []string
+	Age   uint8
+	Value float64
+	Levels  []int
+	IsMale     bool
+	Birth     time.Time
+	Address []string
+	Mail   string
+	Schools []school
+	Courses map[string]course
+}
+
+func (this *student) Version() string {
+	return "V1"
+}
+
+func (this *student) Group() string {
+	return "STUDENT_GROUP"
+}
+
+
+var tiStudent *typeInfo
+var now = time.Now()
+var pStudent = &student {
+		ID: 101,
+		Name: []string{"Tom", "W", "Bush"},
+		Value: 98.5,
+		Levels: []int{6, 7, 9, 8, 10},
+		Age: 22,
+		Birth: now.AddDate(-22, 0, 0),
+		IsMale: true,
+		Address: []string{"5th street 11", "1st road 123"},
+		Mail:  "tom@gmail.com",
+		Courses: map[string]course{
+			"phisic": {"phisic", now.AddDate(0, -5, 0), 80.5},
+			"english": {"english", now.AddDate(0, -2, 0), 93.8},
+		},
+		Schools: []school{
+			{"1st jounir school", []string{"1", "2"}, [2]time.Time{now.AddDate(-6, 0, 0), now.AddDate(-3, 0, 0)}},
+			{"primary school", []string{"23", "456"}, [2]time.Time{now.AddDate(-3, 0, 0), now.AddDate(0, -1, 0)}},
+		},
+	}
+
+func init() {
+	tiStudent = parse(student{})
+	Register(pStudent)
+}
+
+func BenchmarkTypeInfoMarshal(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		tiStudent.marshal(pStudent)
+	}
+}
+
+func BenchmarkGobMarshal(b *testing.B) {
+	var network bytes.Buffer
+	for i := 0; i < b.N; i++ {
+		network.Reset()
+		gob.NewEncoder(&network).Encode(pStudent)
+	}
+}
+
+func TestStudentUnmarshal(t *testing.T) {
+	buf, _ := tiStudent.marshal(pStudent)
+	var s student
+	if err := tiStudent.unmarshalTo(buf, &s); err != nil {
+		t.Error("Failed to unmarshal student: ", err)
+	}
+}
+
+func BenchmarkTypeInfoUnmarshal(b *testing.B) {
+	buf, _ := tiStudent.marshal(pStudent)
+	var s student
+	for i := 0; i < b.N; i++ {
+		buf.Rewind()
+		if err := tiStudent.unmarshalTo(buf, &s); err != nil {
+			b.Error("Failed to unmarshal student: ", err)
+		}
+	}
+}
+
+func BenchmarkGobUnmarshal(b *testing.B) {
+	var network bytes.Buffer
+	var s student
+	gob.NewEncoder(&network).Encode(pStudent)
+	for i := 0; i < b.N; i++ {
+		gob.NewDecoder(bytes.NewReader(network.Bytes())).Decode(&s)
+	}
+}
+
+func BenchmarkTSSDMarshal(b *testing.B) {
+	n := &Buffer {}
+	for i := 0; i < b.N; i++ {
+		MarshalTo(pStudent, n.Clear())
+	}
+}
+
+func BenchmarkTSSDUUnmarshal(b *testing.B) {
+	n := &Buffer {}
+	MarshalTo(pStudent, n)
+	var s student
+	for i := 0; i < b.N; i++ {
+		n.Rewind()
+		UnmarshalTo(n, &s)
+	}
+}
