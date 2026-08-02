@@ -1321,3 +1321,34 @@ func TestNilString(t *testing.T) {
 	doMarshalUnmarshal(t, &st{"hello"}, &st{""})
 	doMarshalUnmarshal(t, &st{"hello"}, &st{"foo"})
 }
+
+func TestTimePointer(t *testing.T) {
+	type st struct {
+		Tt *time.Time
+	}
+
+	tt := time.Now()
+	s1 := st{
+		&tt,
+	}
+	var s2 st
+	doMarshalUnmarshal(t, &s1, &s2)
+	doMarshalUnmarshal(t, &st{}, &st{})
+
+	doMarshalUnmarshal(t, &[]st{}, &[]st{})
+	doMarshalUnmarshal(t, &[]st{s1}, &[]st{})
+	s1.Tt = nil
+	doMarshalUnmarshal(t, &[]st{s1}, &[]st{})
+
+	doMarshalUnmarshal(t, &map[int]st{}, &map[int]st{1: s1})
+	s1.Tt = &tt
+	doMarshalUnmarshal(t, &map[int]st{1: s1}, &map[int]st{})
+	s1.Tt = nil
+	doMarshalUnmarshal(t, &map[int]st{1: s1}, &map[int]st{})
+
+	doMarshalUnmarshal(t, &map[int]map[string]st{}, &map[int]map[string]st{})
+	s1.Tt = &tt
+	doMarshalUnmarshal(t, &map[int]map[string]st{1: {"hello": s1}}, &map[int]map[string]st{})
+	s1.Tt = nil
+	doMarshalUnmarshal(t, &map[int]map[string]st{1: {"hello": s1}}, &map[int]map[string]st{})
+}
