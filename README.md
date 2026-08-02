@@ -11,6 +11,8 @@ tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data w
 
 ## benchmark test
 ```
+$go test -v -bench="(TypeInfo*|Gob*)"
+
 goos: windows
 goarch: amd64
 pkg: github.com/tssdorg/tssdgo/tssd
