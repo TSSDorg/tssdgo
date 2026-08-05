@@ -77,7 +77,7 @@ type Header struct {
 
 // [Tobject][sizet/4bytes][sizea/2bytes][Tuint16][Fragments/2bytes][Tuint16][Current/2bytes][...]
 type Schema struct {
-	Fragment int16 //Fragment ID: [1,2,-3], < 0 means a ending fragment
+	Fragment int16 //Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
 	Hash     string
 	TID      string
 	Extent   string
@@ -92,10 +92,10 @@ type Patch struct {
 type Fragment struct {
 	Header
 	Schema
-	heads    []byte //bytes before payload
-	payload  []byte //TSSD content only
-	Checksum []byte //disgest of all the Fragment bytes
-	Data     []byte //raw data including fragment header, TSSD content, Checksum
+	heads    []byte // bytes before payload(including payload's Tarraym head)
+	payload  []byte // TSSD content only
+	checksum []byte // disgest of all the Fragment bytes(including checksum's Tarram head)
+	Data     []byte // raw data including fragment header, TSSD content, Checksum
 }
 
 var HashFunc func([]byte) []byte = hash
@@ -130,7 +130,7 @@ func (frag *Fragment) Unmarshal(input []byte) (more int, remain []byte, err erro
 	headLen := len(frag.heads)
 	frag.heads = frag.Data[:headLen]
 	frag.payload = frag.Data[headLen : headLen+len(frag.payload)]
-	frag.Checksum = frag.Data[headLen+len(frag.payload)+TSSD_TARRAYM_HEAD_LENGTH:]
+	frag.checksum = frag.Data[headLen+len(frag.payload):]
 	return more, remain, err
 }
 
@@ -183,21 +183,24 @@ func (frag *Fragment) unmarshal(input []byte) (more int, remain []byte, err erro
 	posData := buf.pos + TSSD_TARRAYM_HEAD_LENGTH
 	more, frag.payload, err = mergeByteSliceDump(data[buf.pos:])
 	if err != nil {
-		return more, frag.payload, err
+		return more, nil, err
 	}
 	frag.heads = data[:posData]
 	//data before Checksum need hash to validate
 	needCheck := data[0 : posData+len(frag.payload)]
-	posChecksum := len(needCheck) + TSSD_TARRAYM_HEAD_LENGTH
-	more, frag.Checksum, err = mergeByteSliceDump(data[len(needCheck):])
+	posChecksum := len(needCheck)
+	more, checksum, err := mergeByteSliceDump(data[len(needCheck):])
 	if err != nil {
-		return more, frag.Checksum, err
+		return more, nil, err
 	}
+	// keep checksum including the Tarraym header
+	frag.checksum = data[len(needCheck) : len(needCheck)+TSSD_TARRAYM_HEAD_LENGTH+len(checksum)]
+
 	if err = frag.Validate(needCheck); err != nil {
 		return 0, nil, err
 	}
-	frag.Data = data[:posChecksum+len(frag.Checksum)]
-	return 0, data[posChecksum+len(frag.Checksum):], nil
+	frag.Data = data[:posChecksum+len(frag.checksum)]
+	return 0, data[posChecksum+len(frag.checksum):], nil
 }
 
 // read a fragment
@@ -233,11 +236,23 @@ func (frag *Fragment) Write(wr io.Writer) (nn int, err error) {
 }
 
 func (frag *Fragment) Validate(input []byte) error {
-	// if frag.Checksum is empty, we skip checksum validation
-	if len(frag.Checksum) > 0 && string(ChecksumFunc(input)) != string(frag.Checksum) {
+	// if frag.Checksum() is empty, we skip checksum validation
+	if len(frag.Checksum()) > 0 && string(ChecksumFunc(input)) != string(frag.Checksum()) {
 		return ErrorTSSDDataChecksumFailure
 	}
 	return nil
+}
+
+func (frag *Fragment) Heads() []byte {
+	return frag.heads[:len(frag.heads)-TSSD_TARRAYM_HEAD_LENGTH]
+}
+
+func (frag *Fragment) Payload() []byte {
+	return frag.payload
+}
+
+func (frag *Fragment) Checksum() []byte {
+	return frag.checksum[TSSD_TARRAYM_HEAD_LENGTH:]
 }
 
 // [Tarraym][Tbyte][sizet][sizea][...]
@@ -248,8 +263,8 @@ func (frag *Fragment) Validate(input []byte) error {
 //		error:  ErrorInSufficientData means need more data to unmarshal
 //		        ErrorInvalidTSSDData is invalid data, you need drop all of them
 func mergeByteSliceDump(input []byte) (more int, remain []byte, err error) {
-	if len(input) < 8 {
-		return 8 - len(input), nil, ErrorInSufficientData
+	if len(input) < TSSD_TARRAYM_HEAD_LENGTH {
+		return TSSD_TARRAYM_HEAD_LENGTH - len(input), nil, ErrorInSufficientData
 	}
 
 	if string(input[:2]) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
@@ -263,11 +278,11 @@ func mergeByteSliceDump(input []byte) (more int, remain []byte, err error) {
 	if size4 != int32(arrayN)+TSSD_SIZEA_LENGTH {
 		return 0, nil, fmt.Errorf("%w [Fragment Tarraym size %d %d invalid]", ErrorInvalidTSSDData, size4, arrayN)
 	}
-	if len(input[8:]) < int(arrayN) {
-		return int(arrayN) - len(input[8:]), nil, ErrorInSufficientData
+	if len(input[TSSD_TARRAYM_HEAD_LENGTH:]) < int(arrayN) {
+		return int(arrayN) - len(input[TSSD_TARRAYM_HEAD_LENGTH:]), nil, ErrorInSufficientData
 	}
 
-	return 0, input[8 : 8+int(arrayN)], nil
+	return 0, input[TSSD_TARRAYM_HEAD_LENGTH : TSSD_TARRAYM_HEAD_LENGTH+int(arrayN)], nil
 }
 
 func init() {
