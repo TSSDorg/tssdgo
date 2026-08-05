@@ -114,12 +114,14 @@ func (buf *Buffer) finish() {
 
 func (buf *Buffer) appendChecksum(index int) {
 	checksum := ChecksumFunc(buf.fragments[index].Data)
+	posChecksum := len(buf.fragments[index].Data)
 	//exclude all info about checksum
 	buf.fragments[index].Data = append(buf.fragments[index].Data, byte(Tarraym))
 	buf.fragments[index].Data = append(buf.fragments[index].Data, byte(Tuint8))
 	buf.fragments[index].Data = appendSize4(buf.fragments[index].Data, len(checksum)+TSSD_SIZEA_LENGTH)
 	buf.fragments[index].Data = appendSize2(buf.fragments[index].Data, len(checksum))
 	buf.fragments[index].Data = append(buf.fragments[index].Data, checksum...)
+	buf.fragments[index].checksum = buf.fragments[index].Data[posChecksum:]
 }
 
 func (buf *Buffer) Append(bs []byte) *Buffer {
@@ -318,7 +320,7 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 		buf.fragments = make(map[int]*Fragment)
 		buf.schema = &frag.Schema
 		buf.heads = frag.heads
-		buf.lenChecksum = len(frag.Data) - len(frag.heads) - len(frag.payload) //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
+		buf.lenChecksum = len(frag.Data) - len(frag.heads) - len(frag.payload)
 	}
 
 	if buf.schema.Hash != frag.Schema.Hash {

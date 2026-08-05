@@ -37,8 +37,16 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 		t.Fatalf("expected payload %q, got %q", payload, frag.payload)
 	}
 
-	if string(frag.Checksum) != string(expectedChecksum) {
-		t.Fatalf("expected checksum %q, got %q", expectedChecksum, frag.Checksum)
+	if string(frag.Checksum()) != string(expectedChecksum) {
+		t.Fatalf("expected checksum %q, got %q", expectedChecksum, frag.Checksum())
+	}
+
+	if string(frag.Payload()) != string(payload) {
+		t.Fatalf("expected payload %q, got %q", payload, frag.payload)
+	}
+
+	if len(frag.checksum) != 8 + len(expectedChecksum) {
+		t.Fatalf("expected checksum %q, got %q", expectedChecksum, frag.Checksum())
 	}
 }
 
