@@ -148,6 +148,10 @@ func TestStudent(t *testing.T) {
 	}
 
 	n.Merge()
+	if len(n.Fragments()) != 1 {
+		t.Error("TestStudent merge fail")
+	}
+
 	var v4 Student
 	tssd.UnmarshalTo(n, &v4)
 	fmt.Println("-----v4:", v4)
@@ -156,6 +160,10 @@ func TestStudent(t *testing.T) {
 	}
 
 	n.Rewind().Split(378)
+	if len(n.Fragments()) == 1 {
+		t.Error("TestStudent split fail")
+	}
+
 	var v5 Student
 	tssd.UnmarshalTo(n, &v5)
 	fmt.Println("-----v5:", v5, len(n.Fragments()), n.MTU)

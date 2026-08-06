@@ -94,17 +94,18 @@ func (buf *Buffer) writePos() (int, int) {
 }
 
 func (buf *Buffer) finish() {
-	//we need update fragment id
-	buf.updateFragmentID(buf.windex, -(buf.windex + 1)) //mark ending fragment
-
 	//update the real fragment data size for the last fragment
 	pos := len(buf.heads)
 	length := len(buf.fragments[buf.windex].payload)
-	appendSize4(buf.fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length+TSSD_SIZEA_LENGTH)
-	appendSize2(buf.fragments[buf.windex].Data[:pos-TSSD_SIZEA_LENGTH], length)
-
 	//reset Data to the real size, we will use Data to send out
 	buf.fragments[buf.windex].Data = buf.fragments[buf.windex].Data[:pos+length]
+	if pos == 0 { // do nothing when heads empty
+		return
+	}
+	//we need update fragment id
+	buf.updateFragmentID(buf.windex, -(buf.windex + 1)) //mark ending fragment
+	appendSize4(buf.fragments[buf.windex].Data[:pos-TSSD_SIZET_LENGTH-TSSD_SIZEA_LENGTH], length+TSSD_SIZEA_LENGTH)
+	appendSize2(buf.fragments[buf.windex].Data[:pos-TSSD_SIZEA_LENGTH], length)
 
 	//at last we need append checksum when finish(many sizet will update at finish)
 	for i := 0; i <= buf.windex; i++ {
@@ -367,55 +368,42 @@ func (buf *Buffer) Merge() *Buffer {
 	if len(buf.fragments) < 2 {
 		return buf
 	}
-	frags := buf.fragments //old frags
-	buf.fragments = map[int]*Fragment{
-		0: &Fragment{
-			Header: frags[0].Header,
-			Schema: frags[0].Schema,
-			Data:   make([]byte, 0, len(frags[0].Data)-len(frags[0].payload)+buf.Size),
-		},
-	}
-	frag := buf.fragments[0] //new one
-	headLen := len(frags[0].Data) - buf.lenChecksum - len(frags[0].payload)
-	frag.Data = append(frag.Data, frags[0].Data[:headLen]...)
-	frag.payload = frag.Data[headLen:headLen]
-	frag.heads = frag.Data[:headLen]
-	buf.Size = 0
-	buf.windex = 0
-	buf.MTU = cap(frag.Data)
-	if len(buf.heads) == 0 {
-		buf.heads = frag.Data[:headLen]
-	}
+	buf.Rewind()
+	buf.split(buf.Size + len(buf.heads) + buf.lenChecksum)
 
-	for i := 0; i < len(frags); i++ {
-		buf.Append(frags[i].payload)
-	}
-	buf.finish()
 	return buf
 }
 
 // split large fragments into small ones
 func (buf *Buffer) Split(mtu int) *Buffer {
-	nMTU := max(mtu, TSSD_BUFFER_MIN_MTU)
-	if buf.MTU < nMTU || buf.Size <= nMTU {
+	if buf.MTU <= mtu {
 		return buf
 	}
-	// merge first
-	buf.Merge()
-	frag := buf.fragments[0]
+	return buf.split(mtu)
+}
 
+// re-split fragments with specify mtu
+func (buf *Buffer) split(mtu int) *Buffer {
+	//nMTU := max(mtu, TSSD_BUFFER_MIN_MTU)
+	if mtu <= len(buf.heads)+buf.lenChecksum {
+		return buf
+	}
 	// init buf by the new mtu
-	buf.MTU = nMTU
+	buf.MTU = mtu
 	buf.Size = 0
 	buf.windex = 0
 	buf.index = 0
 	buf.pos = 0
+	frags := buf.fragments // origin data
 	buf.fragments = make(map[int]*Fragment)
 
-	// append all data back
-	return buf.Append(frag.payload)
-}
+	for i := 0; i < len(frags); i++ {
+		buf.Append(frags[i].payload)
+	}
+	buf.finish()
 
+	return buf
+}
 
 // read all splited fragments from a reader
 func (buf *Buffer) ReadFragments(rd io.Reader) error {
