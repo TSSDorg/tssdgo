@@ -222,6 +222,52 @@ func TestBufferAppendAndReadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestBufferSplitMerge(t *testing.T) {
+	buf := &Buffer{MTU: 3}
+	buf.Append([]byte("1234567890"))
+	buf.finish()
+
+	if len(buf.fragments) != 4 {
+		t.Fatalf("expected fragments to size 4, but got %d", len(buf.fragments))
+	}
+
+	buf.Split(7)
+	if len(buf.fragments) != 4 {
+		t.Fatalf("expected do nothing, but got %d", len(buf.fragments))
+	}
+
+	buf.split(7)
+	if len(buf.fragments) != 2 {
+		t.Fatalf("expected fragments to size 2, but got %d", len(buf.fragments))
+	}
+
+	buf.Merge()
+	if len(buf.fragments) != 1 {
+		t.Fatalf("expected fragments to size 1, but got %d", len(buf.fragments))
+	}
+
+	buf.Split(7)
+	if len(buf.fragments) != 2 {
+		t.Fatalf("expected Split fragments to size 2, but got %d", len(buf.fragments))
+	}
+
+	if buf.Size != 10 {
+		t.Fatalf("expected buf size 10, but got %d", buf.Size)
+	}
+
+	firstChunk, err := buf.Read(make([]byte, 6))
+	if err != nil || string(firstChunk) != "123456" {
+		t.Fatalf("expected first chunk %q, got %q", "123456", firstChunk)
+	}
+
+	secondChunk, err := buf.Read(make([]byte, 4))
+	if err != nil || len(secondChunk) != 4 || string(secondChunk) != "7890" {
+		t.Fatalf("expected second chunk %q, got %q", "7890", secondChunk)
+	}
+}
+
+
+
 func TestBufferPeekByteAndRewind(t *testing.T) {
 	buf := &Buffer{MTU: 16}
 	buf.Append([]byte("abc"))
