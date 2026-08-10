@@ -86,7 +86,8 @@ func (buf *Buffer) Clear() *Buffer {
 func (buf *Buffer) writePos() (int, int) {
 	idx := len(buf.fragments) - 1
 	pos := len(buf.fragments[idx].payload)
-	if pos >= buf.avail(idx) {
+
+	if pos >= buf.wavail(idx) {
 		pos = 0
 		idx++
 	}
@@ -149,13 +150,13 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			buf.updateFragmentID(buf.windex, buf.windex+1)
 		}
 
-		if len(buf.fragments[buf.windex].payload)+len(bs) <= buf.avail(buf.windex) {
+		if len(buf.fragments[buf.windex].payload)+len(bs) <= buf.wavail(buf.windex) {
 			buf.fragments[buf.windex].payload = append(buf.fragments[buf.windex].payload, bs...)
 			buf.Size += len(bs)
 			return buf
 		}
 
-		fill := buf.avail(buf.windex) - len(buf.fragments[buf.windex].payload)
+		fill := buf.wavail(buf.windex) - len(buf.fragments[buf.windex].payload)
 		buf.fragments[buf.windex].payload = append(buf.fragments[buf.windex].payload, bs[:fill]...)
 		buf.Size += fill
 		bs = bs[fill:]
@@ -179,11 +180,19 @@ func (buf *Buffer) PeekByte() (b byte, err error) {
 	if buf.Size == 0 {
 		return 0, ErrorInSufficientData
 	}
+	if buf.pos >= buf.avail(buf.index) {
+		buf.pos -= buf.avail(buf.index)
+		buf.index++
+	}
 	return buf.fragments[buf.index].payload[buf.pos], nil
 }
 
 func (buf *Buffer) avail(index int) int {
-	return cap(buf.fragments[index].payload) - buf.lenChecksum
+	return len(buf.fragments[index].payload)
+}
+
+func (buf *Buffer) wavail(index int) int {
+	return cap(buf.fragments[buf.index].Data) - len(buf.heads) - buf.lenChecksum
 }
 
 func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
@@ -197,18 +206,20 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 
 	result = dest
 	wanted := len(dest)
-
+	if buf.pos >= buf.avail(buf.index) {
+		buf.pos -= buf.avail(buf.index)
+		buf.index++
+	}
 	n := copy(dest[:wanted], buf.fragments[buf.index].payload[buf.pos:buf.avail(buf.index)])
 	buf.Size -= n
 	buf.pos += n
-	if buf.pos >= buf.avail(buf.index) {
-		buf.pos = 0
-		buf.index++
-	}
 	if n >= wanted {
 		return result, nil
 	}
-
+	if buf.pos >= buf.avail(buf.index) {
+		buf.pos -= buf.avail(buf.index)
+		buf.index++
+	}
 	dest = dest[n:]
 	for {
 		n = copy(dest, buf.fragments[buf.index].payload[:buf.avail(buf.index)])
@@ -220,10 +231,6 @@ func (buf *Buffer) Read(dest []byte) (result []byte, err error) {
 		buf.index++
 	}
 	buf.pos += n
-	if buf.pos >= buf.avail(buf.index) {
-		buf.pos = 0
-		buf.index++
-	}
 	return result, nil
 }
 
@@ -269,12 +276,12 @@ func (buf *Buffer) updateSize(index, pos, value int) {
 	l := int32(value)
 	s := Slice(Ptr(&l), unsafe.Sizeof(l))
 	for i := 0; i < len(s); i++ {
-		buf.fragments[index].payload[pos] = s[i]
-		pos++
-		if pos >= buf.avail(index) {
+		if pos >=  buf.wavail(index) {
 			pos = 0
 			index++
 		}
+		buf.fragments[index].payload[pos] = s[i]
+		pos++
 	}
 }
 
