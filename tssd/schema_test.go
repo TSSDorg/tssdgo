@@ -79,8 +79,9 @@ func (this *worker_V2) TID() string {
 func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema{
 		-1,
-		string(tssd.HashFunc(this.Types())),
 		this.TID(),
+		string(tssd.HashFunc(this.Types())),
+		this.Group(),
 		"you can put a json object string",
 	}
 }
@@ -125,9 +126,10 @@ func (this *worker_V1) Schema() tssd.Schema {
 	fmt.Println("hash value:", ret)
 	return tssd.Schema{
 		-1,
+		this.TID(),
 		//string(tssd.HashFunc(this.Types())),
 		ret,
-		this.TID(),
+		this.Group(),
 		SCHEMA_CONTENT,
 	}
 }

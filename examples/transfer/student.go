@@ -4,36 +4,40 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
 
 type Course struct {
-	Name     string
-	TestTime time.Time
-	Score    float32
+	Title   string
+	Teacher string
+	Score   float32
 }
 
-type School struct {
-	Name           string
-	Camp           []string
-	EntryLeaveTime [2]time.Time
+type Contact struct {
+	Name     string
+	Relation string
+	Phone    string
+	Address  string
+}
+
+type Paper struct {
+	Title   string
+	Tags    []string
+	Content string
 }
 
 type Student struct {
 	tssd.Flat[Student, *Student] // add Flat Base here
-	ID                           int64
-	Name                         []string
-	Age                          uint8
-	Value                        float64
-	Levels                       []int
-	IsMale                       bool
-	Birth                        time.Time
-	Address                      []string
-	Mail                         string
-	Schools                      []School
-	Courses                      map[string]Course
+
+	ID     uint64
+	Name   string
+	Age    int16
+	IsMale bool
+
+	Contacts []Contact
+	Courses  map[string]Course
+	Papers   []Paper
 }
 
 const STUDENT_GROUP = "Student"
@@ -45,7 +49,9 @@ func (this *Student) Group() string   { return STUDENT_GROUP }
 // demo: simple request with a fragment
 type Request struct {
 	tssd.Flat[Request, *Request]
-	Fid int32
+	Fid   int16
+	Types string
+	Tid   string
 	// bla, bla, maybe you need send something others
 }
 
@@ -66,6 +72,9 @@ func handleRequestRecv(rr io.Reader) (*Request, error) {
 		return nil, err
 	}
 
+	list := rBuf.Fragments()
+	fmt.Println("recv Request: ", list[0].Data)
+
 	// When Buffer is complete, you can Unmarshal to a object
 	var req Request
 	if err := tssd.UnmarshalTo(rBuf, &req); err != nil {
@@ -80,28 +89,52 @@ func handleRequestRecv(rr io.Reader) (*Request, error) {
 var nbuf *tssd.Buffer
 
 func handleEchoRequest(rw io.ReadWriter) error {
-	now := time.Now()
 	if nbuf == nil {
 		nbuf = &tssd.Buffer{
-			MTU: 256,
+			MTU: 512,
 		}
 		v := &Student{
-			ID:      101,
-			Name:    []string{"Tom", "W", "Bush"},
-			Value:   98.5,
-			Levels:  []int{6, 7, 9, 8, 10},
-			Age:     22,
-			Birth:   now.AddDate(-22, 0, 0),
-			IsMale:  true,
-			Address: []string{"5th street 11", "1st road 123"},
-			Mail:    "tom@gmail.com",
-			Courses: map[string]Course{
-				"phisic":  {Name: "phisic", TestTime: now.AddDate(0, -5, 0), Score: 80.5},
-				"english": {Name: "english", TestTime: now.AddDate(0, -2, 0), Score: 93.8},
+			ID:     101,
+			Name:   "Donald J Tramp",
+			Age:    80,
+			IsMale: true,
+			Contacts: []Contact{
+				Contact{
+					Name:     "Alice",
+					Relation: "Mother",
+					Phone:    "13456778889966677788",
+					Address:  "werhweuirhewirhierhiehiehterihtre",
+				},
+				Contact{
+					Name:     "Bob",
+					Relation: "Father",
+					Phone:    "13556778889966677788",
+					Address:  "afwererewerhweuirhewirhierhiehiehterihtre",
+				},
 			},
-			Schools: []School{
-				{Name: "1st jounir school", Camp: []string{"1", "2"}, EntryLeaveTime: [2]time.Time{now.AddDate(-6, 0, 0), now.AddDate(-3, 0, 0)}},
-				{Name: "primary school", Camp: []string{"23", "456"}, EntryLeaveTime: [2]time.Time{now.AddDate(-3, 0, 0), now.AddDate(0, -1, 0)}},
+			Courses: map[string]Course{
+				"English": Course{
+					Title:   "English",
+					Teacher: "Mrs White",
+					Score:   90.5,
+				},
+				"Math": Course{
+					Title:   "Math",
+					Teacher: "Mr. Frank",
+					Score:   80.5,
+				},
+			},
+			Papers: []Paper{
+				Paper{
+					Title:   "xxxxxxxxxxxxxxxx study",
+					Tags:    []string{"AI", "Math", "algorithem"},
+					Content: "asfdsfwererrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrweetertertrtr",
+				},
+				Paper{
+					Title:   "xxxxxxxxxxxxxxxxyyy study",
+					Tags:    []string{"AI", "Math", "algorithem"},
+					Content: "asfdsfwererrrrrrrdgdgdfgfhfhfrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrweetertertrtr",
+				},
 			},
 		}
 
@@ -139,7 +172,7 @@ func handleEchoRequest(rw io.ReadWriter) error {
 func sendRequest(fid int, wr io.Writer) error {
 	wBuf := &tssd.Buffer{}
 	request := &Request{
-		Fid: int32(fid),
+		Fid: int16(fid),
 	}
 	// marshal request into a Buffer
 	// then you got the data:  Buffer.Fragments()[i].Data

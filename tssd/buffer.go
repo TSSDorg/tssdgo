@@ -145,7 +145,7 @@ func (buf *Buffer) Append(bs []byte) *Buffer {
 			}
 			if buf.schema != nil {
 				buf.fragments[buf.windex].Schema = *buf.schema
-				buf.fragments[buf.windex].Schema.Fragment = int16(buf.windex + 1)
+				buf.fragments[buf.windex].Schema.FID = int16(buf.windex + 1)
 			}
 			buf.updateFragmentID(buf.windex, buf.windex+1)
 		}
@@ -331,14 +331,14 @@ func (buf *Buffer) Push(frag *Fragment) (miss int, err error) {
 		buf.lenChecksum = len(frag.Data) - len(frag.heads) - len(frag.payload)
 	}
 
-	if buf.schema.Hash != frag.Schema.Hash {
+	if buf.schema.Types != frag.Schema.Types {
 		return buf.Wanted(), ErrorTSSDDataSchemaUnmatch
 	}
 	if buf.schema.TID != frag.Schema.TID {
 		return buf.Wanted(), ErrorTSSDDataFragmentIDUnmatch
 	}
 
-	fid := int(frag.Schema.Fragment) //fid: [1, 2, 3.. -n], the last < 0
+	fid := int(frag.Schema.FID) //fid: [1, 2, 3.. -n], the last < 0
 	fid = max(-fid, fid)             //Abs
 
 	if _, ok := buf.fragments[fid-1]; ok {
@@ -362,7 +362,7 @@ func (buf *Buffer) Wanted() int {
 		if !ok {
 			return i + 1
 		}
-		if fra.Schema.Fragment < 0 {
+		if fra.Schema.FID < 0 {
 			return 0
 		}
 	}

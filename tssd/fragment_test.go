@@ -27,10 +27,10 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 	if frag.Header.Version[0] != TSSD_VERSION_MINOR || frag.Header.Version[1] != TSSD_VERSION_MAJOR {
 		t.Fatalf("unexpected version bytes: %v", frag.Header.Version)
 	}
-	if frag.Schema.Fragment != 1 {
-		t.Fatalf("expected fragment id 1, got %d", frag.Schema.Fragment)
+	if frag.Schema.FID != 1 {
+		t.Fatalf("expected fragment id 1, got %d", frag.Schema.FID)
 	}
-	if frag.Schema.Hash != "hash" || frag.Schema.TID != "tid" || frag.Schema.Extent != "extent" {
+	if frag.Schema.Types != "hash" || frag.Schema.TID != "tid" || frag.Schema.Info != "extent" {
 		t.Fatalf("unexpected schema: %+v", frag.Schema)
 	}
 	if string(frag.payload) != string(payload) {
@@ -98,7 +98,7 @@ func buildFragmentBytes(t *testing.T, payload []byte, disableChecksum bool) ([]b
 	buf.Append([]byte(MAGIC))
 	buf.Append([]byte{TSSD_VERSION_MINOR, TSSD_VERSION_MAJOR, Tschema})
 
-	schema := Schema{Fragment: 1, Hash: "hash", TID: "tid", Extent: "extent"}
+	schema := Schema{FID: 1, Types: "hash", TID: "tid", Info: "extent"}
 	if err := schema.marshal(buf); err != nil {
 		t.Fatalf("schema marshal failed: %v", err)
 	}

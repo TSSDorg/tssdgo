@@ -1,6 +1,7 @@
 package tssd
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -66,7 +67,7 @@ type Flatable interface {
 	TID() string
 
 	//extent info in schema
-	Extent() string
+	Info() string
 }
 
 type constrainFlatable[T any] interface {
@@ -95,16 +96,19 @@ func (*Flat[T, PT]) Progeny() string {
 func (this *Flat[T, PT]) Types() []byte {
 	obj := this.Build()
 	g, version := obj.Group(), obj.Version()
+	fmt.Println(g, version, " Types:", groups[g].versions[version].info.types())
 	return groups[g].versions[version].info.types()
 }
 
 
 func (this *Flat[T, PT]) Schema() Schema {
+	fmt.Println("Types:", this.Types(), ", hash:", string(HashFunc(this.Types())))
 	return Schema{
 		-1,
-		string(HashFunc(this.Types())),
 		this.TID(),
-		this.Extent(),
+		string(HashFunc(this.Types())),
+		this.Group(),
+		this.Info(),
 	}
 }
 
@@ -123,7 +127,7 @@ func (this *Flat[T, PT]) TID() string {
 	return string(b)
 }
 
-func (*Flat[T, PT]) Extent() string {
+func (*Flat[T, PT]) Info() string {
 	return ""
 }
 

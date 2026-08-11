@@ -53,7 +53,7 @@ func TestBuffer2(t *testing.T) {
 
 	d, err = buf.Read(dest[:4])
 	if err != nil || len(d) != 4 || string(d) != string(MAGIC[1:]) || buf.Size != 0 || buf.index != 2 || buf.pos != 1 {
-		t.Error("Buffer read 4 bytes err:", err, d, buf)
+		t.Error("Buffer read 4 bytes err:", err, d, buf.Size, buf.index, buf.pos)
 	}
 
 	if d, err = buf.Read(dest[:1]); err == nil {
@@ -306,8 +306,8 @@ func TestBufferPushAndWanted(t *testing.T) {
 		t.Fatalf("expected Wanted to report no missing fragments, got %d", got)
 	}
 
-	first := &Fragment{Data: []byte("hello"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 1}}
-	second := &Fragment{Data: []byte("world"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: 2}}
+	first := &Fragment{Data: []byte("hello"), Schema: Schema{Types: "hash", TID: "tid", FID: 1}}
+	second := &Fragment{Data: []byte("world"), Schema: Schema{Types: "hash", TID: "tid", FID: 2}}
 
 	miss, err := buf.Push(first)
 	if err != nil {
@@ -329,7 +329,7 @@ func TestBufferPushAndWanted(t *testing.T) {
 		t.Fatalf("expected Wanted to report no missing fragments, got %d", got)
 	}
 
-	third := &Fragment{Data: []byte("!"), Schema: Schema{Hash: "hash", TID: "tid", Fragment: -3}}
+	third := &Fragment{Data: []byte("!"), Schema: Schema{Types: "hash", TID: "tid", FID: -3}}
 	miss, err = buf.Push(third)
 	if err != nil || miss != 0 {
 		t.Fatalf("pushing third fragment failed: %v", err)

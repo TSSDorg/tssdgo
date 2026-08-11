@@ -77,10 +77,11 @@ type Header struct {
 
 // [Tobject][sizet/4bytes][sizea/2bytes][Tuint16][Fragments/2bytes][Tuint16][Current/2bytes][...]
 type Schema struct {
-	Fragment int16 //Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
-	Hash     string
-	TID      string
-	Extent   string
+	FID      int16  // Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
+	TID      string // object ID
+	Types    string // Types
+	Group    string // Group
+	Info     string // reserve for other user info
 }
 
 type Patch struct {
@@ -220,7 +221,7 @@ func (frag *Fragment) Read(rd io.Reader) (err error) {
 		size += n
 		more, remain, err = frag.unmarshal(bs[:size]) // call internal api, no need copy
 		if err == nil {
-			fmt.Println("Received fragment:", frag.Fragment, " with length:", len(frag.Data), " remain:", len(remain))
+			fmt.Println("Received fragment:", frag.FID, " with length:", len(frag.Data), " remain:", len(remain))
 			// need drop the data from bufio to prepare the next fragment
 			return nil
 		}
