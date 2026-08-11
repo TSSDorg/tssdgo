@@ -46,14 +46,14 @@ type Student struct {
 	Courses map[string]Course
 }
 
-const STUDENT_GROUP = "Student"
+const STUDENT_FAMILY = "Student"
 
 func (this *Student) Version() string {
 	return "V1"
 }
 
-func (this *Student) Group() string {
-	return STUDENT_GROUP
+func (this *Student) Family() string {
+	return STUDENT_FAMILY
 }
 
 

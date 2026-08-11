@@ -40,11 +40,11 @@ type Student struct {
 	Papers   []Paper
 }
 
-const STUDENT_GROUP = "Student"
+const STUDENT_FAMILY = "Student"
 
-// Version and Group is the two method you should implement
+// Version and Family is the two method you should implement
 func (this *Student) Version() string { return "V1" }
-func (this *Student) Group() string   { return STUDENT_GROUP }
+func (this *Student) Family() string  { return STUDENT_FAMILY }
 
 // demo: simple request with a fragment
 type Request struct {
@@ -56,7 +56,7 @@ type Request struct {
 }
 
 func (this *Request) Version() string { return "V1" }
-func (this *Request) Group() string   { return "Request" }
+func (this *Request) Family() string  { return "Request" }
 
 // make sure register before Marshal or Unmarshal
 func init() {

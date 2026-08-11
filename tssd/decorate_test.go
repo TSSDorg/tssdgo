@@ -9,42 +9,42 @@ import (
 
 //this file demo for a struct update/migrate between versions
 
-//versions should share the group name, so let it be a const name
-const DECORATE_STUDENT_GROUP = "decorate_test.student"
+// versions should share the family name, so let it be a const name
+const DECORATE_STUDENT_FAMILY = "decorate_test.student"
 
-//you can register many version BEFORE call TSSD API
+// you can register many version BEFORE call TSSD API
 func init() {
 	tssd.Register(&student{})
 	tssd.Register(&student_V2{})
 	tssd.Register(&student_V1{})
 }
 
-//you can alias to simplify for users, 
-//but update it after every update the struct
+// you can alias to simplify for users,
+// but update it after every update the struct
 type student = student_V3
 
-////////////////////////////the student V3////////////////////////////////////
-//after you need add/update the struct 
-//you need implment Progeny() string to specify which version 
-//and rename a new class name
+// //////////////////////////the student V3////////////////////////////////////
+// after you need add/update the struct
+// you need implment Progeny() string to specify which version
+// and rename a new class name
 type student_V3 struct {
-	tssd.Flat[student_V3, *student_V3]     //tssd.Flat implement some default API in Flatable
-	Address []string  //the new version of student, which we update to slice
-	Age int16
-	Name string
+	tssd.Flat[student_V3, *student_V3]          //tssd.Flat implement some default API in Flatable
+	Address                            []string //the new version of student, which we update to slice
+	Age                                int16
+	Name                               string
 }
 
-//Flatable.Group is the one  you should override it
-func (this *student_V3) Group() string {
-	return DECORATE_STUDENT_GROUP
+// Flatable.Family is the one  you should override it
+func (this *student_V3) Family() string {
+	return DECORATE_STUDENT_FAMILY
 }
 
-//Flatable.Version is the one you should override it
+// Flatable.Version is the one you should override it
 func (this *student_V3) Version() string {
 	return "student_V3"
 }
 
-func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
+func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable {
 	//you may upgrade from v2
 	if old, ok := flat.(*student_V2); ok {
 		this.Name = old.Name
@@ -61,31 +61,31 @@ func (this *student_V3) Decorate(flat tssd.Flatable) tssd.Flatable{
 	return this
 }
 
-////////////////////////////the student V2////////////////////////////////////
-//after you need add/update the struct 
-//you need implment Progeny() string to specify which version 
-//and rename a new class name
+// //////////////////////////the student V2////////////////////////////////////
+// after you need add/update the struct
+// you need implment Progeny() string to specify which version
+// and rename a new class name
 type student_V2 struct {
 	tssd.Flat[student_V2, *student_V2]
-	Age int16
-	Address string  //the new version of student, which we add a new field Address
-	Name string
+	Age     int16
+	Address string //the new version of student, which we add a new field Address
+	Name    string
 }
 
-//Group() return the group name
-//versions should share the group name, just like the last name in your family
-func (this *student_V2) Group() string {
-	return DECORATE_STUDENT_GROUP
+// Family() return the family name
+// versions should share the family name, just like the last name in your family
+func (this *student_V2) Family() string {
+	return DECORATE_STUDENT_FAMILY
 }
 
-//Version() should return the uniq version name in group
-//just like your first name in your family
+// Version() should return the uniq version name in family
+// just like your first name in your family
 func (this *student_V2) Version() string {
 	return "student_V2"
 }
 
-//Decorate define how convert a V1 student to a V2 student
-func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
+// Decorate define how convert a V1 student to a V2 student
+func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable {
 	old := flat.(*student_V1)
 	this.Name = old.Name
 	this.Age = old.Age
@@ -93,27 +93,27 @@ func (this *student_V2) Decorate(flat tssd.Flatable) tssd.Flatable{
 	return this
 }
 
-//Progeny tell TSSD to convert(Decorate) V2 student to  V3 one if needed
+// Progeny tell TSSD to convert(Decorate) V2 student to  V3 one if needed
 func (this *student_V2) Progeny() string {
 	return "student_V3"
 }
 
-////////////////////////////the student V1////////////////////////////////////
-//after you need add/update the struct 
-//you need implment Progeny() string to specify which version 
-//and rename a new class name
+// //////////////////////////the student V1////////////////////////////////////
+// after you need add/update the struct
+// you need implment Progeny() string to specify which version
+// and rename a new class name
 type student_V1 struct {
 	tssd.Flat[student_V1, *student_V1]
 	Name string
-	Age int16
+	Age  int16
 }
 
 func (this *student_V1) Version() string {
 	return "student_V1"
 }
 
-func (this *student_V1) Group() string {
-	return DECORATE_STUDENT_GROUP
+func (this *student_V1) Family() string {
+	return DECORATE_STUDENT_FAMILY
 }
 
 func (this *student_V1) Progeny() string {
@@ -124,10 +124,10 @@ var name = "Donald J. Trump"
 var age int16 = 80
 var defaultAddress = "White House"
 
-//test V1->V2->V3
-func TestUnmarshalDecorate(t *testing.T) {	
+// test V1->V2->V3
+func TestUnmarshalDecorate(t *testing.T) {
 
-	st := student_V1 {
+	st := student_V1{
 		Name: name,
 		//"White Hourse",
 		Age: age,
@@ -138,8 +138,8 @@ func TestUnmarshalDecorate(t *testing.T) {
 	var s1 student_V1
 	buf2 := tssd.Pipe(buf)
 	//buf input by v1, you can receive v1
-	err := tssd.UnmarshalTo(buf2, &s1);
-	if  err != nil || s1.Name != name || s1.Age != age {
+	err := tssd.UnmarshalTo(buf2, &s1)
+	if err != nil || s1.Name != name || s1.Age != age {
 		t.Errorf("unmarshalTo v1 fail")
 	}
 
@@ -147,21 +147,21 @@ func TestUnmarshalDecorate(t *testing.T) {
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s2);
-	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress{
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s2)
+	if err != nil || s2.Name != name || s2.Age != age || s2.Address != defaultAddress {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s3);
-	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s3)
+	if err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != defaultAddress {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
 	//but you can receive a latest one
-	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_GROUP)
-	if  err != nil {
+	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_FAMILY)
+	if err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
 
@@ -173,7 +173,7 @@ func TestUnmarshalDecorate(t *testing.T) {
 }
 
 func TestObjectPtr(t *testing.T) {
-	st := student {
+	st := student{
 		Name: name,
 		//"White Hourse",
 		Age: age,
@@ -185,13 +185,13 @@ func TestObjectPtr(t *testing.T) {
 
 }
 
-//V2->V1(fail), V2->V3 ok
-func TestUnmarshalDecorate2(t *testing.T) {	
+// V2->V1(fail), V2->V3 ok
+func TestUnmarshalDecorate2(t *testing.T) {
 
-	st := student_V2 {
-		Name: name,
+	st := student_V2{
+		Name:    name,
 		Address: "White Hourse",
-		Age: age,
+		Age:     age,
 	}
 
 	buf, _ := tssd.Marshal(&st)
@@ -207,28 +207,28 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	var s1 student_V1
 	buf2 := tssd.Pipe(buf)
 	//buf input by v2, you can't downgrade to v1
-	err := tssd.UnmarshalTo(buf2, &s1);
-	if  err == nil {
+	err := tssd.UnmarshalTo(buf2, &s1)
+	if err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s2);
-	if  err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s2)
+	if err != nil || s2.Name != name || s2.Age != age || s2.Address != st.Address {
 		fmt.Println(err, s2)
 		t.Errorf("unmarshalTo v2 fail")
 	}
 
 	var s3 student
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s3);
-	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address {
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s3)
+	if err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
-	//but you can receive a latest one with a group name
-	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_GROUP)
-	if  err != nil {
+	//but you can receive a latest one with a family name
+	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_FAMILY)
+	if err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
 
@@ -238,14 +238,13 @@ func TestUnmarshalDecorate2(t *testing.T) {
 	}
 }
 
+// V2->V1(fail), V2->V3 ok
+func TestUnmarshalDecorate3(t *testing.T) {
 
-//V2->V1(fail), V2->V3 ok
-func TestUnmarshalDecorate3(t *testing.T) {	
-
-	st := student_V3 {
-		Name: name,
-		Address: []string {"White Hourse",},
-		Age: age,
+	st := student_V3{
+		Name:    name,
+		Address: []string{"White Hourse"},
+		Age:     age,
 	}
 
 	buf, _ := tssd.Marshal(&st)
@@ -261,27 +260,27 @@ func TestUnmarshalDecorate3(t *testing.T) {
 	var s1 student_V1
 	buf2 := tssd.Pipe(buf)
 	//buf input by v2, you can't downgrade to v1
-	err := tssd.UnmarshalTo(buf2, &s1);
-	if  err == nil {
+	err := tssd.UnmarshalTo(buf2, &s1)
+	if err == nil {
 		t.Errorf("unmarshalTo v1  should fail")
 	}
 
 	var s2 student_V2
 	//buf input by v1, you can receive v2
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s2);
-	if  err == nil {
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s2)
+	if err == nil {
 		t.Errorf("unmarshalTo v2 should fail")
 	}
 
 	var s3 student
-	err = tssd.UnmarshalTo(buf2.Rewind(), &s3);
-	if  err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address[0] {
+	err = tssd.UnmarshalTo(buf2.Rewind(), &s3)
+	if err != nil || s3.Name != name || s3.Age != age || s3.Address[0] != st.Address[0] {
 		t.Errorf("unmarshalTo v3 fail")
 	}
 
 	//but you can receive a latest one
-	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_GROUP)
-	if  err != nil {
+	flat, err := tssd.Unmarshal(buf2.Rewind(), DECORATE_STUDENT_FAMILY)
+	if err != nil {
 		t.Errorf("unmarshal v3 fail")
 	}
 
@@ -293,17 +292,17 @@ func TestUnmarshalDecorate3(t *testing.T) {
 
 func TestRegister(t *testing.T) {
 	//we have registered in init()
-	current := tssd.CurrentVersion(DECORATE_STUDENT_GROUP)
+	current := tssd.CurrentVersion(DECORATE_STUDENT_FAMILY)
 	if current != (&student{}).Version() {
 		t.Errorf("register Student failed")
 	}
 
 	tssd.RegisterCurrent(&student_V2{})
-	current = tssd.CurrentVersion(DECORATE_STUDENT_GROUP)
+	current = tssd.CurrentVersion(DECORATE_STUDENT_FAMILY)
 	if current != (&student_V2{}).Version() {
 		t.Errorf("register Student failed")
 	}
 	if tssd.CurrentVersion("xxx") != "" {
 		t.Errorf("get CurrentVersion failed")
-	} 
+	}
 }

@@ -77,11 +77,11 @@ type Header struct {
 
 // [Tobject][sizet/4bytes][sizea/2bytes][Tuint16][Fragments/2bytes][Tuint16][Current/2bytes][...]
 type Schema struct {
-	FID      int16  // Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
-	TID      string // object ID
-	Types    string // Types
-	Group    string // Group
-	Info     string // reserve for other user info
+	FID    int16  // Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
+	TID    string // object ID
+	Types  string // Types
+	Family string // Family
+	Info   string // reserve for other user info
 }
 
 type Patch struct {

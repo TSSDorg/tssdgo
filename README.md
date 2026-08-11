@@ -45,9 +45,9 @@ a simple [transer demo](https://github.com/TSSDorg/tssdgo/blob/main/examples/tra
 another support struct version migration snippet
 
 ```
-//define a const group name for your class/struct
+//define a const family name for your class/struct
 //it will share between versions
-const DECORATE_STUDENT_GROUP = "decorate_test.student"
+const DECORATE_STUDENT_FAMILY = "decorate_test.student"
 
 //you can alias simplify for users
 //but update it after every update the struct
@@ -64,13 +64,13 @@ type student_V2 struct {
 	Name string
 }
 
-//Group() return the group name
-//versions should share the group name, just like the last name in your family
-func (this *student_V2) Group() string {
-	return DECORATE_STUDENT_GROUP
+//Family() return the family name
+//versions should share the family name, just like the last name in your family
+func (this *student_V2) Family() string {
+	return DECORATE_STUDENT_FAMILY
 }
 
-//Version() should return the uniq version name in group
+//Version() should return the uniq version name in family
 //just like your first name in your family
 func (this *student_V2) Version() string {
 	return "student_V2"
@@ -94,10 +94,10 @@ type student_V1 struct {
 	Age int16
 }
 
-//Group() return the group name
-//versions should share the group name, just like the last name in your family
-func (this *student_V1) Group() string {
-	return DECORATE_STUDENT_GROUP
+//Family() return the family name
+//versions should share the family name, just like the last name in your family
+func (this *student_V1) Family() string {
+	return DECORATE_STUDENT_FAMILY
 }
 
 func (this *student_V1) Version() string {

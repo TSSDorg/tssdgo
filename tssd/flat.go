@@ -5,32 +5,32 @@ import (
 	"math/rand"
 )
 
-var groups = map[string]*factory{}
+var families = map[string]*factory{}
 
 func Register(flat Flatable) {
-	group := flat.Group()
-	_, ok := groups[group]
+	family := flat.Family()
+	_, ok := families[family]
 	if !ok {
-		groups[group] = &factory{
+		families[family] = &factory{
 			current:  flat.Version(), //register first one as the current
 			versions: make(map[string]*buildInfo, 0),
 			schemas:  make(map[string]*buildInfo, 0),
 		}
 	}
-	groups[group].register(flat)
+	families[family].register(flat)
 }
 
 // default the first register one regard as current
 // but we can let user overritten it by the new api
 func RegisterCurrent(flat Flatable) {
 	Register(flat)
-	groups[flat.Group()].current = flat.Version()
+	families[flat.Family()].current = flat.Version()
 }
 
-// return current version of the register group
-// return "" if group not exist
-func CurrentVersion(group string) string {
-	if factory, ok := groups[group]; ok {
+// return current version of the register family
+// return "" if family not exist
+func CurrentVersion(family string) string {
+	if factory, ok := families[family]; ok {
 		return factory.current
 	}
 	return ""
@@ -49,8 +49,8 @@ type Flatable interface {
 	//return none-nil error will block factory to Unmarsh
 	//OnHeader(header Header) (err error)
 
-	//return group of this class, suggest base class name, EG: Student
-	Group() string
+	//return family of this class, suggest base class name, EG: Student
+	Family() string
 
 	//return ver of the object, such as V1
 	Version() string
@@ -85,7 +85,7 @@ func (*Flat[T, PT]) Version() string {
 	return TSSD_FLAT_KIND
 }
 
-func (*Flat[T, PT]) Group() string {
+func (*Flat[T, PT]) Family() string {
 	return TSSD_FLAT_KIND
 }
 
@@ -95,9 +95,9 @@ func (*Flat[T, PT]) Progeny() string {
 
 func (this *Flat[T, PT]) Types() []byte {
 	obj := this.Build()
-	g, version := obj.Group(), obj.Version()
-	fmt.Println(g, version, " Types:", groups[g].versions[version].info.types())
-	return groups[g].versions[version].info.types()
+	g, version := obj.Family(), obj.Version()
+	fmt.Println(g, version, " Types:", families[g].versions[version].info.types())
+	return families[g].versions[version].info.types()
 }
 
 
@@ -107,7 +107,7 @@ func (this *Flat[T, PT]) Schema() Schema {
 		-1,
 		this.TID(),
 		string(HashFunc(this.Types())),
-		this.Group(),
+		this.Family(),
 		this.Info(),
 	}
 }
@@ -141,21 +141,21 @@ func Marshal(flat Flatable) (*Buffer, error) {
 }
 
 func MarshalTo(flat Flatable, buf *Buffer) error {
-	if factory, ok := groups[flat.Group()]; ok {
+	if factory, ok := families[flat.Family()]; ok {
 		return factory.marshalTo(flat, buf)
 	}
 	return ErrorTSSDDataSchemaUnmatch
 }
 
 func UnmarshalTo(buf *Buffer, to Flatable) error {
-	if factory, ok := groups[to.Group()]; ok {
+	if factory, ok := families[to.Family()]; ok {
 		return factory.unmarshalTo(buf, to)
 	}
 	return ErrorTSSDDataSchemaUnmatch
 }
 
-func Unmarshal(buf *Buffer, group string) (to Flatable, err error) {
-	if factory, ok := groups[group]; ok {
+func Unmarshal(buf *Buffer, family string) (to Flatable, err error) {
+	if factory, ok := families[family]; ok {
 		return factory.unmarshal(buf)
 	}
 	return nil, ErrorTSSDDataSchemaUnmatch
