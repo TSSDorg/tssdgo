@@ -80,7 +80,6 @@ type Schema struct {
 	FID    int16  // Fragment ID: [1,2,...,(N-1), -N], < 0 means an ending fragment
 	TID    string // object ID
 	Types  string // Types
-	Family string // Family
 	Info   string // reserve for other user info
 }
 

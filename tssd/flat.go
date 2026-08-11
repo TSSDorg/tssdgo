@@ -107,7 +107,6 @@ func (this *Flat[T, PT]) Schema() Schema {
 		-1,
 		this.TID(),
 		string(HashFunc(this.Types())),
-		this.Family(),
 		this.Info(),
 	}
 }

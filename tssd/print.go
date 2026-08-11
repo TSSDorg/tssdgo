@@ -240,7 +240,7 @@ func (factory factory) print(version string, buf *Buffer) error {
 		Children: []*Node{
 			&Node{Content: fmt.Sprintf("Magic([5]byte):{%s}", string(header.Magic[:]))},
 			&Node{Content: fmt.Sprintf("Version[major.minor]:%d.%d", header.Version[1], header.Version[0])},
-			&Node{Content: fmt.Sprintf("Schema:{%s %s %s %d %s}", frag.Schema.Family, frag.Schema.Types, frag.Schema.TID, frag.Schema.FID, frag.Schema.Info)},
+			&Node{Content: fmt.Sprintf("Schema:{%s %s %d %s}", frag.Schema.Types, frag.Schema.TID, frag.Schema.FID, frag.Schema.Info)},
 		},
 	}
 
