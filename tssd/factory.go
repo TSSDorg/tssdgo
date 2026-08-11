@@ -39,7 +39,7 @@ func (factory *factory) register(flat Flatable) {
 
 	factory.versions[flat.Version()] = bi
 	bi.schema = flat.Schema()
-	hash := bi.schema.Hash
+	hash := bi.schema.Types
 	bi.hash = hash
 	factory.schemas[hash] = bi
 }
@@ -63,7 +63,7 @@ func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 	if len(buf.fragments) == 0 {
 		return ErrorInSufficientData
 	}
-	remoteHash := buf.fragments[0].Schema.Hash
+	remoteHash := buf.fragments[0].Schema.Types
 	local := factory.versions[dest.Version()].hash
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {
@@ -108,7 +108,7 @@ func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
 	if len(buf.fragments) == 0 {
 		return nil, ErrorInSufficientData
 	}
-	remoteHash := buf.fragments[0].Schema.Hash
+	remoteHash := buf.fragments[0].Schema.Types
 
 	bi, ok := factory.schemas[remoteHash]
 	if !ok {

@@ -34,7 +34,7 @@ func init() {
 		}*/
 }
 
-const WORKER_GROUP_NAME = "work_group_name"
+const WORKER_FAMILY_NAME = "work_family_name"
 
 // you can alias to simplify for users,
 // but update it after every update the struct
@@ -51,8 +51,8 @@ type worker_V2 struct {
 	Name    string
 }
 
-func (this *worker_V2) Group() string {
-	return WORKER_GROUP_NAME
+func (this *worker_V2) Family() string {
+	return WORKER_FAMILY_NAME
 }
 
 func (this *worker_V2) Version() string {
@@ -79,8 +79,9 @@ func (this *worker_V2) TID() string {
 func (this *worker_V2) Schema() tssd.Schema {
 	return tssd.Schema{
 		-1,
-		string(tssd.HashFunc(this.Types())),
 		this.TID(),
+		string(tssd.HashFunc(this.Types())),
+		this.Family(),
 		"you can put a json object string",
 	}
 }
@@ -95,8 +96,8 @@ type worker_V1 struct {
 	Age  int16
 }
 
-func (this *worker_V1) Group() string {
-	return WORKER_GROUP_NAME
+func (this *worker_V1) Family() string {
+	return WORKER_FAMILY_NAME
 }
 
 func (this *worker_V1) Version() string {
@@ -125,9 +126,10 @@ func (this *worker_V1) Schema() tssd.Schema {
 	fmt.Println("hash value:", ret)
 	return tssd.Schema{
 		-1,
+		this.TID(),
 		//string(tssd.HashFunc(this.Types())),
 		ret,
-		this.TID(),
+		this.Family(),
 		SCHEMA_CONTENT,
 	}
 }
@@ -206,7 +208,7 @@ type TestStruct struct {
 	Age int16
 }
 
-func (this *TestStruct) Group() string {
+func (this *TestStruct) Family() string {
 	return "TestStruct"
 }
 
@@ -220,7 +222,7 @@ type TestStruct2 struct {
 	tssd.Flat[TestStruct2, *TestStruct2]
 }
 
-func (this *TestStruct2) Group() string {
+func (this *TestStruct2) Family() string {
 	return "TestStruct2"
 }
 
@@ -234,7 +236,7 @@ type TestStruct3 struct {
 	M map[string]TestStruct2
 }
 
-func (this *TestStruct3) Group() string {
+func (this *TestStruct3) Family() string {
 	return "TestStruct3"
 }
 

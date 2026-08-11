@@ -38,8 +38,8 @@ func (this *student) Version() string {
 	return "V1"
 }
 
-func (this *student) Group() string {
-	return "STUDENT_GROUP"
+func (this *student) Family() string {
+	return "STUDENT_FAMILY"
 }
 
 
@@ -71,8 +71,11 @@ func init() {
 }
 
 func BenchmarkTypeInfoMarshal(b *testing.B) {
+	buf := &Buffer {
+		MTU: 2048,
+	}
 	for i := 0; i < b.N; i++ {
-		tiStudent.marshal(pStudent)
+		tiStudent.marshalTo(pStudent, buf.Clear())
 	}
 }
 
@@ -113,7 +116,7 @@ func BenchmarkGobUnmarshal(b *testing.B) {
 }
 
 func BenchmarkTSSDMarshal(b *testing.B) {
-	n := &Buffer {}
+	n := &Buffer {MTU: 2048}
 	for i := 0; i < b.N; i++ {
 		MarshalTo(pStudent, n.Clear())
 	}
