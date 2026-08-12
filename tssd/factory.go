@@ -9,7 +9,6 @@ type buildInfo struct {
 	version string //current version
 	progeny string //which version it can upgrade after decoration
 	schema  Schema //current schema
-	hash    string
 	info    *typeInfo
 	builder Flatable //keep it as builder
 }
@@ -17,7 +16,6 @@ type buildInfo struct {
 type factory struct {
 	current  string
 	versions map[string]*buildInfo //local we seek by names or version
-	schemas  map[string]*buildInfo //and remote we seek by schema
 }
 
 func (factory *factory) register(flat Flatable) {
@@ -39,9 +37,6 @@ func (factory *factory) register(flat Flatable) {
 
 	factory.versions[flat.Version()] = bi
 	bi.schema = flat.Schema()
-	hash := bi.schema.Types
-	bi.hash = hash
-	factory.schemas[hash] = bi
 }
 
 func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
@@ -58,17 +53,16 @@ func (factory *factory) marshalTo(flat Flatable, buf *Buffer) error {
 	return err
 }
 
-// UnmarshalTo direct unmarshal to your object
+// UnmarshalTo directly to your object
 func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 	if len(buf.fragments) == 0 {
 		return ErrorInSufficientData
 	}
 	remoteHash := buf.fragments[0].Schema.Types
-	local := factory.versions[dest.Version()].hash
-	bi, ok := factory.schemas[remoteHash]
-	if !ok {
-		fmt.Printf("remote schema hash[%s] not found(unregisted), local:[%s]\n", remoteHash, local)
-		return ErrorTSSDDataSchemaUnmatch
+	local := factory.versions[dest.Version()].schema.Types
+	bi, err := getBuildInfoByTypes(remoteHash)
+	if err != nil {
+		return err
 	}
 	buf.Rewind()
 	if local == remoteHash {
@@ -76,7 +70,7 @@ func (factory *factory) unmarshalTo(buf *Buffer, dest Flatable) error {
 	}
 
 	obj := bi.builder.Build()
-	err := bi.info.unmarshalTo(buf, obj)
+	err = bi.info.unmarshalTo(buf, obj)
 	if err != nil {
 		return err
 	}
@@ -110,14 +104,12 @@ func (factory *factory) unmarshal(buf *Buffer) (Flatable, error) {
 	}
 	remoteHash := buf.fragments[0].Schema.Types
 
-	bi, ok := factory.schemas[remoteHash]
-	if !ok {
-		fmt.Printf("remote schema hash[%s] not found(unregisted)\n", remoteHash)
-		return nil, ErrorTSSDDataSchemaUnmatch
+	bi, err := getBuildInfoByTypes(remoteHash)
+	if err != nil {
+		return nil, err
 	}
 	obj := bi.builder.Build()
-
-	err := bi.info.unmarshalTo(buf, obj)
+	err = bi.info.unmarshalTo(buf, obj)
 	if err != nil {
 		return nil, err
 	}

@@ -252,7 +252,7 @@ func (factory factory) print(version string, buf *Buffer) error {
 }
 
 func Print(flat Flatable, buf Buffer) error {
-	factory, ok := families[flat.Family()]
+	factory, ok := registers.families[flat.Family()]
 	if !ok {
 		return ErrorTSSDDataSchemaUnmatch
 	}
