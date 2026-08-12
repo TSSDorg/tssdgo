@@ -58,9 +58,12 @@ func getBuildInfoByTypes(types string) (*buildInfo, error) {
 
 // default the first register one regard as current
 // but we can let user overritten it by the new api
-func RegisterCurrent(flat Flatable) {
-	Register(flat)
+func RegisterCurrent(flat Flatable) error {
+	if err := Register(flat); err != nil {
+		return err
+	}
 	registers.families[flat.Family()].current = flat.Version()
+	return nil
 }
 
 // return current version of the register family
