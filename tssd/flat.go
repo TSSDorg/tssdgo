@@ -22,7 +22,10 @@ func init() {
 }
 
 
-func Register(flat Flatable) {
+func Register(flat Flatable) error {
+	if len(flat.Family()) == 0 || len(flat.Version()) == 0 {
+		return ErrorRegisterFlatFailure
+	}
 	family := flat.Family()
 	_, ok := registers.families[family]
 	if !ok {
@@ -41,6 +44,7 @@ func Register(flat Flatable) {
 		flat.Family(),
 		flat.Version(),
 	}
+	return nil
 }
 
 func getBuildInfoByTypes(types string) (*buildInfo, error) {

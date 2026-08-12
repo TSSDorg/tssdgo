@@ -67,6 +67,7 @@ var ErrorTSSDDataSchemaUnmatch = errors.New("TSSD data schema not match or unreg
 var ErrorTSSDHeadOverSizeFragment = errors.New("TSSD Head large than fragment size limitation")
 var ErrorTSSDDataChecksumFailure = errors.New("TSSD fragment data checksum failure")
 var ErrorTSSDDataFragmentIDUnmatch = errors.New("TSSD fragments TID unmatch")
+var ErrorRegisterFlatFailure = errors.New("register Flatable falure: Family and Version should not empty")
 
 var schemaTypeInfo *typeInfo
 
