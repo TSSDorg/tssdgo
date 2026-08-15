@@ -144,8 +144,8 @@ func (this *Flat[T, PT]) Schema() Schema {
 	fmt.Println("Types:", this.Types(), ", hash:", string(HashFunc(this.Types())))
 	return Schema{
 		-1,
-		this.TID(),
 		string(HashFunc(this.Types())),
+		this.TID(),
 		this.Info(),
 	}
 }
