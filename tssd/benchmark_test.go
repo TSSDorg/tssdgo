@@ -148,7 +148,7 @@ func BenchmarkTSSDMarshal(b *testing.B) {
 	}
 }
 
-func BenchmarkTSSDUUnmarshal(b *testing.B) {
+func BenchmarkTSSDUnmarshal(b *testing.B) {
 	n := &Buffer {}
 	MarshalTo(pStudent, n)
 	var s student

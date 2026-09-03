@@ -10,33 +10,46 @@ tssdgo implement TSSD with Go(golang), you can read, write and print TSSD data w
 
 
 ## benchmark test
+Marshal
 ```
-$go test -v -bench="(TypeInfo*|Gob*|TSSD*)"
-
+$go test -v -bench="(TypeInfo*|Gob*|Json*|TSSD*)Marshal"  
 goos: windows
 goarch: amd64
 pkg: github.com/tssdorg/tssdgo/tssd
 cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics
 BenchmarkTypeInfoMarshal
-BenchmarkTypeInfoMarshal-16               337573              3499 ns/op
+BenchmarkTypeInfoMarshal-16       296326              4090 ns/op
 BenchmarkGobMarshal
-BenchmarkGobMarshal-16                    170007              6618 ns/op
-BenchmarkTypeInfoUnmarshal
-BenchmarkTypeInfoUnmarshal-16             420558              2667 ns/op
-BenchmarkGobUnmarshal
-BenchmarkGobUnmarshal-16                   63486             19122 ns/op
+BenchmarkGobMarshal-16            144670              8168 ns/op
+BenchmarkJsonMarshal
+BenchmarkJsonMarshal-16           298766              4035 ns/op
 BenchmarkTSSDMarshal
-BenchmarkTSSDMarshal-16                   217504              5373 ns/op
-BenchmarkTSSDUUnmarshal
-BenchmarkTSSDUUnmarshal-16                429708              2664 ns/op
-PASS
-ok      github.com/tssdorg/tssdgo/tssd  8.220s
-
-TSSD(with fragments) marshal nearly 1.2x faster than GOB
-TSSD's underlying typeinfo marshal nearly 1.8x faster than GOB
-TSSD unmarshal nearly 7x faster than GOB
-
+BenchmarkTSSDMarshal-16           159531              6996 ns/op
 ```
+**TSSD core(TypeInfo 4090) marshal performace is almost same with json(4035),  
+TSSD with Fragments support(6996) is little faster than Gob(8168).**
+
+Unmarshal
+```
+$go test -v -bench="(TypeInfo*|Gob*|Json*|TSSD*)Unmarshal"  
+goos: windows
+goarch: amd64
+pkg: github.com/tssdorg/tssdgo/tssd
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics
+BenchmarkTypeInfoUnmarshal
+BenchmarkTypeInfoUnmarshal-16             368180              3337 ns/op
+BenchmarkGobUnmarshal
+BenchmarkGobUnmarshal-16                   50680             24058 ns/op
+BenchmarkJsonUnmarshal
+BenchmarkJsonUnmarshal-16                 149484              8010 ns/op
+BenchmarkTSSDUnmarshal
+BenchmarkTSSDUnmarshal-16                 322578              3356 ns/op
+PASS
+ok      github.com/tssdorg/tssdgo/tssd  6.018s
+```
+**TSSD core(TypeInfo 3337) unmarshal performace is 2X fast json(8010),  
+TSSD with Fragments support(3356) is 7X faster than Gob(24058).**
+
 
 ## quick start
 
