@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	tssd "github.com/tssdorg/tssdgo/tssd"
 )
@@ -34,6 +35,7 @@ type Student struct {
 	Name   string
 	Age    int16
 	IsMale bool
+	Birth  time.Time
 
 	Contacts []Contact
 	Courses  map[string]Course
@@ -52,6 +54,7 @@ type Request struct {
 	Fid   int16
 	Types string
 	Tid   string
+	Time  time.Time
 	// bla, bla, maybe you need send something others
 }
 
@@ -98,6 +101,7 @@ func handleEchoRequest(rw io.ReadWriter) error {
 			Name:   "Donald J Tramp",
 			Age:    80,
 			IsMale: true,
+			Birth:  time.Now().AddDate(-22, 1, 2),
 			Contacts: []Contact{
 				Contact{
 					Name:     "Alice",
