@@ -3,6 +3,8 @@ package tssd
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
+	"fmt"
 	"time"
 	"testing"
 )
@@ -70,6 +72,23 @@ func init() {
 	Register(pStudent)
 }
 
+func TestStudentStorageSize(t *testing.T) {
+	blob, _ := json.Marshal(*pStudent)
+	fmt.Println("json size:", len(blob))
+
+	var network bytes.Buffer
+	gob.NewEncoder(&network).Encode(pStudent)
+	fmt.Println("gob size:", len(network.Bytes()))
+	buf, _ := tiStudent.marshal(pStudent)
+	fmt.Println("tssd size:", buf.Size)
+
+	n := &Buffer {MTU: 2048}
+
+	MarshalTo(pStudent, n)
+	fmt.Println("tssd Fragments size:", len(n.fragments[0].Data))
+}
+
+
 func BenchmarkTypeInfoMarshal(b *testing.B) {
 	buf := &Buffer {
 		MTU: 2048,
@@ -87,13 +106,12 @@ func BenchmarkGobMarshal(b *testing.B) {
 	}
 }
 
-func TestStudentUnmarshal(t *testing.T) {
-	buf, _ := tiStudent.marshal(pStudent)
-	var s student
-	if err := tiStudent.unmarshalTo(buf, &s); err != nil {
-		t.Error("Failed to unmarshal student: ", err)
+func BenchmarkJsonMarshal(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		json.Marshal(*pStudent)
 	}
 }
+
 
 func BenchmarkTypeInfoUnmarshal(b *testing.B) {
 	buf, _ := tiStudent.marshal(pStudent)
@@ -112,6 +130,14 @@ func BenchmarkGobUnmarshal(b *testing.B) {
 	gob.NewEncoder(&network).Encode(pStudent)
 	for i := 0; i < b.N; i++ {
 		gob.NewDecoder(bytes.NewReader(network.Bytes())).Decode(&s)
+	}
+}
+
+func BenchmarkJsonUnmarshal(b *testing.B) {
+	blob, _ := json.Marshal(*pStudent)
+	var s student
+	for i := 0; i < b.N; i++ {
+		json.Unmarshal(blob, &s)
 	}
 }
 

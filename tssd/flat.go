@@ -36,7 +36,7 @@ func Register(flat Flatable) error {
 	}
 	registers.families[family].register(flat)
 	schema :=  flat.Schema()
-	fmt.Println("~~~~Register schema:", schema)
+	fmt.Println("TSSD Register family:", flat.Family(), ", version:", flat.Version(), ", schema:", schema)
 	registers.types[schema.Types] = struct {
 		family  string
 		version string
@@ -135,13 +135,13 @@ func (*Flat[T, PT]) Progeny() string {
 func (this *Flat[T, PT]) Types() []byte {
 	obj := this.Build()
 	g, version := obj.Family(), obj.Version()
-	fmt.Println(g, version, " Types:", registers.families[g].versions[version].info.types())
+	//fmt.Println(g, version, " Types:", registers.families[g].versions[version].info.types())
 	return registers.families[g].versions[version].info.types()
 }
 
 
 func (this *Flat[T, PT]) Schema() Schema {
-	fmt.Println("Types:", this.Types(), ", hash:", string(HashFunc(this.Types())))
+	//fmt.Println("Types:", this.Types(), ", hash:", string(HashFunc(this.Types())))
 	return Schema{
 		-1,
 		string(HashFunc(this.Types())),

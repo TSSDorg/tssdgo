@@ -58,7 +58,7 @@ func runClient(addr string) {
 func handleConn(conn net.Conn) {
 	defer conn.Close()
 
-	fmt.Fprintln(conn, "welcome to tcp echo server")
+	//fmt.Fprintln(conn, "welcome to tcp echo server")
 	for {
 		if err := handleEchoRequest(conn); err != nil {
 			fmt.Fprintf(os.Stderr, "echo error: %v\n", err)
