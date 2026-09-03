@@ -23,8 +23,8 @@ const (
 	TSSD_SIZET_LENGTH             = 4
 	TSSD_SIZEA_LENGTH             = 2
 	TSSD_TARRAYM_HEAD_LENGTH      = 8 //8 bytes for [Tarraym][Tuint8][sizet/4B][sizea/2B]
-	TSSD_BUFFER_MIN_MTU           = 256
-	TSSD_BUFFER_MTU               = 2048
+	TSSD_BUFFER_MIN_MTU           = 128
+	TSSD_BUFFER_MTU               = 1440
 	TSSD_FRAGMENT_MIN_HEADER_SIZE = 64
 )
 
@@ -291,12 +291,14 @@ func init() {
 }
 
 func (this *Schema) marshal(buf *Buffer) error {
-	//buf.Clear()
-	err := schemaTypeInfo.marshalTo(this, buf)
-	if err == nil && buf.Size > 0 {
-		buf.fragments[0].Data = buf.fragments[0].Data[:buf.Size]
+	if err := schemaTypeInfo.marshalTo(this, buf); err != nil {
+		return nil
 	}
-	return err
+	if len(buf.fragments) > 1 {
+		return ErrorTSSDHeadOverSizeFragment
+	}
+	buf.fragments[0].Data = buf.fragments[0].Data[:buf.Size]
+	return nil
 }
 
 func (this *Schema) unmarshal(buf *Buffer) error {

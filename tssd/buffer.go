@@ -32,7 +32,7 @@ func (buf *Buffer) prepare(schema Schema) error {
 	//buf.Clear()
 	buf.MTU = max(buf.MTU, TSSD_BUFFER_MIN_MTU)
 	buf.schema = &schema
-	buf.heads = make([]byte, 0, buf.MTU/3)
+	buf.heads = make([]byte, 0, buf.MTU)
 	//create a new buffer to receive
 	nbuf := &Buffer{
 		MTU: buf.MTU,
@@ -54,13 +54,14 @@ func (buf *Buffer) prepare(schema Schema) error {
 	nbuf.Append([]byte{byte(Tarraym), byte(Tuint8)})
 	//we will try to calc the real size of Checksum
 	buf.lenChecksum = TSSD_TARRAYM_HEAD_LENGTH + len(ChecksumFunc(buf.heads))
+	if nbuf.Size + TSSD_SIZET_LENGTH + TSSD_SIZEA_LENGTH + buf.lenChecksum >= nbuf.MTU { //TSSD Heads too large than the MTU(fragment limitation)
+		return ErrorTSSDHeadOverSizeFragment
+	}
+
 	avail := nbuf.MTU - nbuf.Size - TSSD_SIZET_LENGTH - TSSD_SIZEA_LENGTH - buf.lenChecksum
 	nbuf.appendSize4(avail + TSSD_SIZEA_LENGTH) //reserve sizet
 	nbuf.appendSize2(avail)
 	//we will keep a copy of schema in buf.heads
-	if nbuf.Size >= avail { //TSSD Heads too large than the MTU(fragment limitation)
-		return ErrorTSSDHeadOverSizeFragment
-	}
 	buf.heads = nbuf.fragments[0].payload[:nbuf.Size]
 	return nil
 }
