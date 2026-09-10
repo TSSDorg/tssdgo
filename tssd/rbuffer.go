@@ -259,8 +259,9 @@ func (buf *RBuffer) ExtractReader(reader io.Reader) (err error) {
 			}
 
 			fragment := buf.Fragment()
-			if buf.Push(fragment) == nil && !got {
-				got = true
+			exit = (buf.Push(fragment) == nil)
+			if !got {
+				got = exit
 			}
 		}
 	}

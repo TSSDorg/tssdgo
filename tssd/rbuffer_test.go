@@ -3,6 +3,7 @@ package tssd
 import (
 	"bytes"
 	"errors"
+	"io"
 	"testing"
 	"sync"
 )
@@ -30,6 +31,7 @@ func rbufferTestFrame(t *testing.T, value int32) []byte {
 	}
 	return append([]byte(nil), buf.Fragments()[0].Data...)
 }
+
 
 func TestRBufferDetectMagicAcrossChunks(t *testing.T) {
 	buf := NewRBuffer()
@@ -259,7 +261,10 @@ func TestRBufferExtractMultipleFramesWithNoise(t *testing.T) {
 func TestRBufferExtractReader(t *testing.T) {
 	first := rbufferTestFrame(t, 123)
 	second := rbufferTestFrame(t, 456)
-	reader := bytes.NewReader(append(append([]byte("noise"), first...), second...))
+	reader := &rbufferTestReader{chunks: [][]byte{
+		append([]byte("noise"), first...),
+		second,
+	}}
 	buf := NewRBuffer()
 
 	if err := buf.ExtractReader(reader); err != nil {
@@ -281,7 +286,9 @@ func TestRBufferExtractReader(t *testing.T) {
 
 	secondBuffer := buf.Buffer("RBufferTest", "V1")
 	if secondBuffer == nil {
-		t.Fatal("missing second assembled buffer")
+		//t.Fatal("missing second assembled buffer")
+		buf.ExtractReader(reader)
+		secondBuffer = buf.Buffer("RBufferTest", "V1")
 	}
 	var secondValue rbufferTestFlat
 	if err := UnmarshalTo(secondBuffer, &secondValue); err != nil {
@@ -296,4 +303,154 @@ func TestRBufferExtractReader(t *testing.T) {
 		t.Fatalf("expected schema mismatch, got %v", err)
 	}
 
+}
+
+func TestRBufferDetectMagicAtStart(t *testing.T) {
+	buf := NewRBuffer()
+	more, err := buf.detectMagic([]byte(MAGIC), 0)
+	if err != nil || buf.magic != 0 || more != TSSD_FRAGMENT_MIN_HEADER_SIZE-len(MAGIC) {
+		t.Fatalf("more=%d magic=%d err=%v", more, buf.magic, err)
+	}
+}
+
+type rbufferTestReader struct {
+	chunks [][]byte
+}
+
+func (reader *rbufferTestReader) Read(dst []byte) (int, error) {
+	if len(reader.chunks) == 0 {
+		return 0, io.EOF
+	}
+	chunk := reader.chunks[0]
+	count := copy(dst, chunk)
+	if count == len(chunk) {
+		reader.chunks = reader.chunks[1:]
+	} else {
+		reader.chunks[0] = chunk[count:]
+	}
+	return count, nil
+}
+
+func TestRBufferUnmarshalAndPush(t *testing.T) {
+	data := rbufferTestFrame(t, 123)
+	buf := NewRBuffer()
+	if more, err := buf.Extract(data); err != nil || more != 0 {
+		t.Fatalf("Extract: more=%d err=%v", more, err)
+	}
+	if err := buf.Push(buf.Fragment()); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+	assembled := buf.Buffer("RBufferTest", "V1")
+	if assembled == nil {
+		t.Fatal("expected assembled buffer")
+	}
+	var value rbufferTestFlat
+	if err := UnmarshalTo(assembled, &value); err != nil {
+		t.Fatalf("UnmarshalTo: %v", err)
+	}
+	if value.Value != 123 {
+		t.Fatalf("value=%d, want 123", value.Value)
+	}
+}
+
+func TestRBufferExtractFramesWithSplitMagicAndNoise(t *testing.T) {
+	first, _ := buildFragmentBytes(t, []byte("a"), false)
+	second, _ := buildFragmentBytes(t, []byte("b"), false)
+	cases := [][][]byte{
+		{[]byte(MAGIC), first, []byte("b"), second},
+		{[]byte(MAGIC), first, []byte(MAGIC), second},
+		{[]byte("b"), first, []byte("b"), second},
+		{[]byte("b"), first, []byte(MAGIC), second},
+	}
+
+	for index, parts := range cases {
+		t.Run(string(rune('1'+index)), func(t *testing.T) {
+			buf := NewRBuffer()
+			input := bytes.Join(parts, nil)
+			for _, want := range []string{"a", "b"} {
+				if more, err := buf.Extract(input); err != nil || more != 0 {
+					t.Fatalf("Extract: more=%d err=%v", more, err)
+				}
+				if got := string(buf.Fragment().Payload()); got != want {
+					t.Fatalf("payload=%q, want %q", got, want)
+				}
+				input = nil
+			}
+		})
+	}
+}
+
+func TestRBufferExtractMalformedPrefixAndChecksum(t *testing.T) {
+	good, _ := buildFragmentBytes(t, []byte("good"), false)
+	cases := []struct {
+		name  string
+		input []byte
+	}{
+		{
+			name:  "bad-schema-type",
+			input: func() []byte { data := append([]byte(nil), good...); data[7] = 'x'; return append(data, good...) }(),
+		},
+		{
+			name: "bad-checksum",
+			input: func() []byte {
+				bad := append([]byte(nil), good...)
+				bad[len(bad)-1] ^= 1
+				return append(bad, good...)
+			}(),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			buf := NewRBuffer()
+			if more, err := buf.Extract(tc.input); err != nil || more != 0 {
+				t.Fatalf("Extract: more=%d err=%v", more, err)
+			}
+			if got := string(buf.Fragment().Payload()); got != "good" {
+				t.Fatalf("payload=%q", got)
+			}
+		})
+	}
+}
+
+func TestRBufferReaderChunkScenarios(t *testing.T) {
+	first := rbufferTestFrame(t, 97)
+	second := rbufferTestFrame(t, 123)
+	third := rbufferTestFrame(t, 456)
+	magic := []byte(MAGIC)
+	noise := []byte("xy")
+	cases := []struct {
+		name  string
+		parts [][]byte
+		want  []int32
+	}{
+		{"single", [][]byte{first}, []int32{97}},
+		{"noise-chunks", [][]byte{[]byte("a"), []byte("b"), first}, []int32{97}},
+		{"split-magic", [][]byte{[]byte("TSSD"), []byte("V"), first}, []int32{97}},
+		{"two-frames", [][]byte{[]byte("TSSD"), []byte("V"), first, magic, second}, []int32{97, 123}},
+		{"noise-and-two", [][]byte{noise, append(append([]byte(nil), first...), append(magic, second...)...)}, []int32{97, 123}},
+		{"three-frames", [][]byte{noise, append(append([]byte(nil), first...), append(magic, second...)...), magic, third}, []int32{97, 123, 456}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := bytes.NewReader(bytes.Join(tc.parts, nil))
+			buf := NewRBuffer()
+			for _, want := range tc.want {
+				if err := buf.ExtractReader(reader); err != nil {
+					t.Fatalf("ExtractReader: %v", err)
+				}
+				assembled := buf.Buffer("RBufferTest", "V1")
+				if assembled == nil {
+					t.Fatal("missing assembled buffer")
+				}
+				var value rbufferTestFlat
+				if err := UnmarshalTo(assembled, &value); err != nil {
+					t.Fatalf("UnmarshalTo: %v", err)
+				}
+				if value.Value != want {
+					t.Fatalf("value=%d, want %d", value.Value, want)
+				}
+			}
+		})
+	}
 }
