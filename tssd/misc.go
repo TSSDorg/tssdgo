@@ -87,15 +87,15 @@ func Pipe(sender *Buffer) (receiver *Buffer) {
 		numbers[i], numbers[j] = numbers[j], numbers[i]
 	})
 
+	rbuf := NewRBuffer()
 	//TSSD produce in the sender.FragmentData
 	for i := 0; i < len(sender.fragments); i++ {
-		frag := &Fragment{}
-		more, _, err := frag.Unmarshal(sender.fragments[numbers[i]].Data)
+		more, err := rbuf.Extract(sender.fragments[numbers[i]].Data)
 		if err != nil || more != 0 {
 			fmt.Println("data:", sender.fragments[numbers[i]].Data, numbers[i], err)
 			panic("pipe output unmashal fail")
 		}
-		receiver.Push(frag)
+		receiver.Push(rbuf.Fragment())
 	}
 	return receiver
 }

@@ -51,6 +51,21 @@ ok      github.com/tssdorg/tssdgo/tssd  6.018s
 TSSD with Fragments support(3356) is 7X faster than Gob(24058).**
 
 
+storage(space) compare
+```
+$ go test -run=TestStudentStorageSize
+json size: 671
+gob size: 816
+tssd size: 631
+tssd Fragments size: 714
+PASS
+ok      github.com/tssdorg/tssdgo/tssd  0.827s
+```
+**storage depends on the object content deeply,  
+TSSD and Gob is excellent for binary,  
+for the object with large text, gob/tssd/json is almost same**
+
+
 ## quick start
 
 a simple [transer demo](https://github.com/TSSDorg/tssdgo/blob/main/examples/transfer/student.go)

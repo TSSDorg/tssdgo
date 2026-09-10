@@ -1,13 +1,11 @@
 package tssd
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
-	"unsafe"
 )
 
 const (
@@ -112,126 +110,6 @@ func hash(types []byte) []byte {
 	return []byte(hashString[:TSSD_HASH_HALF_SIZE] + hashString[l-TSSD_HASH_HALF_SIZE:l])
 }
 
-// unmarshal fragment manualy from bytes
-// @desc  public api, copy Data from user's space until validate success
-// input: data should contains magic "TSSDV", length should > TSSD_FRAGMENT_MIN_HEADER_SIZE
-//
-// return
-//
-//	 more:   need more data if we meet ErrorInSufficientData
-//		[]byte: remain bytes after consume when unmarshal success
-//		error:  ErrorInSufficientData means need more data to unmarshal
-//		        ErrorInvalidTSSDData is invalid data
-func (frag *Fragment) Unmarshal(input []byte) (more int, remain []byte, err error) {
-	more, remain, err = frag.unmarshal(input)
-	if err != nil {
-		return more, remain, err
-	}
-	frag.Data = append(make([]byte, 0, len(frag.Data)), frag.Data...)
-	headLen := len(frag.heads)
-	frag.heads = frag.Data[:headLen]
-	frag.payload = frag.Data[headLen : headLen+len(frag.payload)]
-	frag.checksum = frag.Data[headLen+len(frag.payload):]
-	return more, remain, err
-}
-
-// we need unmarshal fragment manualy
-// @desc  internal api, we don't copy data from user space
-// input: data should contains magic "TSSDV", length should > TSSD_FRAGMENT_MIN_HEADER_SIZE
-//
-// return
-//
-//	 more:   need more data if we meet ErrorInSufficientData
-//		[]byte: remain bytes after consume when unmarshal success
-//		error:  ErrorInSufficientData means need more data to unmarshal
-//		        ErrorInvalidTSSDData is invalid data
-func (frag *Fragment) unmarshal(input []byte) (more int, remain []byte, err error) {
-	if len(input) < TSSD_FRAGMENT_MIN_HEADER_SIZE {
-		return TSSD_FRAGMENT_MIN_HEADER_SIZE, nil, fmt.Errorf("%w [header magic]", ErrorInSufficientData)
-	}
-
-	i := bytes.Index(input, []byte(MAGIC))
-	if i < 0 {
-		return 0, nil, fmt.Errorf("%w [TSSD MAGIC head invalid]", ErrorInvalidTSSDData)
-	}
-	data := input[i:]
-	buf := &Buffer{
-		Size: len(data),
-		fragments: map[int]*Fragment{
-			0: &Fragment{
-				payload: data,
-				Data:    data,
-			},
-		},
-	}
-
-	buf.Read(frag.Header.Magic[:])
-	buf.Read(frag.Header.Version[:])
-
-	// Tschema
-	if b, _ := buf.ReadByte(); b != byte(Tschema) {
-		return 0, nil, fmt.Errorf("%w [schema type %d invalid]", ErrorInvalidTSSDData, b)
-	}
-
-	err = (&frag.Schema).unmarshal(buf)
-	if err != nil {
-		if errors.Is(err, ErrorInSufficientData) {
-			return TSSD_FRAGMENT_MIN_HEADER_SIZE, nil, err
-		}
-		return 0, nil, err
-	}
-
-	posData := buf.pos + TSSD_TARRAYM_HEAD_LENGTH
-	more, frag.payload, err = mergeByteSliceDump(data[buf.pos:])
-	if err != nil {
-		return more, nil, err
-	}
-	frag.heads = data[:posData]
-	//data before Checksum need hash to validate
-	needCheck := data[0 : posData+len(frag.payload)]
-	posChecksum := len(needCheck)
-	more, checksum, err := mergeByteSliceDump(data[len(needCheck):])
-	if err != nil {
-		return more, nil, err
-	}
-	// keep checksum including the Tarraym header
-	frag.checksum = data[len(needCheck) : len(needCheck)+TSSD_TARRAYM_HEAD_LENGTH+len(checksum)]
-
-	if err = frag.Validate(needCheck); err != nil {
-		return 0, nil, err
-	}
-	frag.Data = data[:posChecksum+len(frag.checksum)]
-	return 0, data[posChecksum+len(frag.checksum):], nil
-}
-
-// read a fragment
-func (frag *Fragment) Read(rd io.Reader) (err error) {
-	more := TSSD_FRAGMENT_MIN_HEADER_SIZE
-	bs := make([]byte, TSSD_BUFFER_MTU, TSSD_BUFFER_MTU)
-	size := 0
-	var remain []byte
-	for {
-		if size+more > len(bs) {
-			bs = append(make([]byte, 0, more+TSSD_BUFFER_MTU), bs...)
-		}
-		n, err := rd.Read(bs[size : size+more])
-		if n == 0 && err != nil {
-			return err
-		}
-		size += n
-		more, remain, err = frag.unmarshal(bs[:size]) // call internal api, no need copy
-		if err == nil {
-			fmt.Println("Received fragment:", frag.FID, " with length:", len(frag.Data), " remain:", len(remain))
-			// need drop the data from bufio to prepare the next fragment
-			return nil
-		}
-		if !errors.Is(err, ErrorInSufficientData) {
-			fmt.Println("Error occurred while unmarshalling:", err)
-			return err
-		}
-	}
-}
-
 func (frag *Fragment) Write(wr io.Writer) (nn int, err error) {
 	return wr.Write(frag.Data)
 }
@@ -254,36 +132,6 @@ func (frag *Fragment) Payload() []byte {
 
 func (frag *Fragment) Checksum() []byte {
 	return frag.checksum[TSSD_TARRAYM_HEAD_LENGTH:]
-}
-
-// [Tarraym][Tbyte][sizet][sizea][...]
-// return
-//
-//	 more:   need more data if we meet ErrorInSufficientData
-//		[]byte: remain bytes after consume, nil if meet err
-//		error:  ErrorInSufficientData means need more data to unmarshal
-//		        ErrorInvalidTSSDData is invalid data, you need drop all of them
-func mergeByteSliceDump(input []byte) (more int, remain []byte, err error) {
-	if len(input) < TSSD_TARRAYM_HEAD_LENGTH {
-		return TSSD_TARRAYM_HEAD_LENGTH - len(input), nil, ErrorInSufficientData
-	}
-
-	if string(input[:2]) != string([]byte{byte(Tarraym), byte(Tuint8)}) {
-		return 0, nil, fmt.Errorf("%w [Fragment Tarraym type %d %d invalid]", ErrorInvalidTSSDData, input[0], input[1])
-	}
-	var size4 int32
-	copy(Slice(Ptr(&size4), unsafe.Sizeof(size4)), input[2:])
-	var arrayN int16
-	copy(Slice(Ptr(&arrayN), unsafe.Sizeof(arrayN)), input[6:])
-
-	if size4 != int32(arrayN)+TSSD_SIZEA_LENGTH {
-		return 0, nil, fmt.Errorf("%w [Fragment Tarraym size %d %d invalid]", ErrorInvalidTSSDData, size4, arrayN)
-	}
-	if len(input[TSSD_TARRAYM_HEAD_LENGTH:]) < int(arrayN) {
-		return int(arrayN) - len(input[TSSD_TARRAYM_HEAD_LENGTH:]), nil, ErrorInSufficientData
-	}
-
-	return 0, input[TSSD_TARRAYM_HEAD_LENGTH : TSSD_TARRAYM_HEAD_LENGTH+int(arrayN)], nil
 }
 
 func init() {

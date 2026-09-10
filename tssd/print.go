@@ -227,11 +227,6 @@ func (factory factory) print(version string, buf *Buffer) error {
 		Content: "TSSD",
 	}
 
-	if len(buf.fragments) == 0 {
-		buf = Pipe(buf)
-	}
-
-	//header, err := //dumpHeader(buf)
 	frag := buf.fragments[0]
 	header := frag.Header
 	fmt.Println("header:", header, info)
