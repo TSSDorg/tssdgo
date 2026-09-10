@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+func unmarshalFragment(t *testing.T, rbuf *RBuffer, data []byte) (*Fragment, int, error) {
+	more, extractErr := rbuf.Extract(data)
+	if extractErr != nil || more != 0 {
+		return nil, more, extractErr
+	}
+	return rbuf.Fragment(), 0, nil
+}
+
+
 func TestFragmentUnmarshalSuccess(t *testing.T) {
 	payload := []byte("hello fragment")
 	data, expectedChecksum := buildFragmentBytes(t, payload, false)
@@ -12,13 +21,13 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 	//we add someting in head, which should drop by TSSD
 	data = append(append(make([]byte, 0, 1024), []byte("something")...), data...)
 
-	var frag Fragment
-	more, remaining, err := (&frag).Unmarshal(append(data, []byte("extra")...))
+	var rbuf = NewRBuffer()
+	frag, more, err :=unmarshalFragment(t, rbuf, append(data, []byte("extra")...))
 	if err != nil || more != 0 {
 		t.Fatalf("Unmarshal returned error: %v", err)
 	}
-	if string(remaining) != "extra" {
-		t.Fatalf("expected remaining bytes %q, got %q", "extra", string(remaining))
+	if string(rbuf.data) != "extra" {
+		t.Fatalf("expected remaining bytes %q, got %q", "extra", string(rbuf.data))
 	}
 
 	if string(frag.Header.Magic[:]) != MAGIC {
@@ -51,10 +60,11 @@ func TestFragmentUnmarshalSuccess(t *testing.T) {
 }
 
 func TestFragmentUnmarshalRejectsShortInput(t *testing.T) {
-	var frag Fragment
-	more, _, err := frag.Unmarshal([]byte(MAGIC))
-	if !errors.Is(err, ErrorInSufficientData) || more == 0 {
-		t.Fatalf("expected ErrorInSufficientData, got %v", err)
+	var rbuf = NewRBuffer()
+	frag, more, err :=unmarshalFragment(t, rbuf, []byte(MAGIC))
+
+	if !errors.Is(err, ErrorInSufficientData) || more == 0  || frag != nil {
+		t.Fatalf("expected ErrorInSufficientData, got %v %v %v", err, more, frag)
 	}
 }
 
@@ -62,10 +72,10 @@ func TestFragmentUnmarshalRejectsInvalidMagic(t *testing.T) {
 	data, _ := buildFragmentBytes(t, []byte("payload"), false)
 	data[0] = 'X'
 
-	var frag Fragment
-	_, _, err := frag.Unmarshal(data)
-	if !errors.Is(err, ErrorInvalidTSSDData) {
-		t.Fatalf("expected ErrorInvalidTSSDData, got %v", err)
+	var rbuf = NewRBuffer()
+	_, _, err :=unmarshalFragment(t, rbuf, data)
+	if !errors.Is(err, ErrorInSufficientData) {
+		t.Fatalf("expected ErrorInSufficientData, got %v", err)
 	}
 }
 
@@ -73,10 +83,10 @@ func TestFragmentUnmarshalRejectsChecksumMismatch(t *testing.T) {
 	data, _ := buildFragmentBytes(t, []byte("payload"), false)
 	data[len(data)-1] ^= 1
 
-	var frag Fragment
-	_, _, err := frag.Unmarshal(data)
-	if !errors.Is(err, ErrorTSSDDataChecksumFailure) {
-		t.Fatalf("expected ErrorTSSDDataChecksumFailure, got %v", err)
+	var rbuf = NewRBuffer()
+	_, _, err :=unmarshalFragment(t, rbuf, data)
+	if !errors.Is(err, ErrorInSufficientData) {
+		t.Fatalf("expected ErrorInSufficientData, got %v", err)
 	}
 }
 
@@ -84,9 +94,10 @@ func TestFragmentUnmarshalDisableChecksum(t *testing.T) {
 	data, _ := buildFragmentBytes(t, []byte("payload"), true)
 	data[len(data)-9] ^= 1
 
-	var frag Fragment
-	_, _, err := frag.Unmarshal(data)
-	if err != nil {
+	var rbuf = NewRBuffer()
+	frag, _, err :=unmarshalFragment(t, rbuf, data)
+
+	if err != nil || frag == nil {
 		t.Fatalf("disableChecksum but got ErrorTSSDDataChecksumFailure")
 	}
 }

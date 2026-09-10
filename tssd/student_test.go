@@ -127,7 +127,9 @@ func TestStudent(t *testing.T) {
 		MTU: 100,
 	}
 
-	tssd.MarshalTo(&v, n)
+	if err := tssd.MarshalTo(&v, n); err != nil {
+		t.Error("TestStruct MarshalTo student failed")
+	}
 
 
 	tssd.Print(&v, *n)
